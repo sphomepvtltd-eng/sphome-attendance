@@ -140,7 +140,7 @@ function loadWorkers() {
     (list || []).forEach(w => {
       const o = document.createElement('option');
       o.value = w.id;
-      o.textContent = w.name + ' (' + w.id + ')';
+      o.textContent = w.id + ' — ' + w.name;
       sel.appendChild(o);
     });
   }

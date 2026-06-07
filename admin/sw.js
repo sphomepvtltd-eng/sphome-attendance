@@ -2,7 +2,7 @@
 //  SP HOME INTERIOR — ADMIN SERVICE WORKER
 //  Scope: /admin/
 // ═══════════════════════════════════════════════════
-const CACHE = 'sphome-admin-v4';
+const CACHE = 'sphome-admin-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -41,14 +41,10 @@ self.addEventListener('activate', function (e) {
 
 self.addEventListener('fetch', function (e) {
   const url = e.request.url;
-  // Never cache the backend API
+  // Backend API: do NOT intercept — let the browser handle it natively.
+  // (Service-worker re-fetch can break cross-origin POST + redirect; bypassing
+  //  it makes clock-in / save / advance POSTs reliable and surfaces real errors.)
   if (url.indexOf('script.google.com') !== -1 || url.indexOf('googleusercontent.com') !== -1) {
-    e.respondWith(
-      fetch(e.request).catch(function () {
-        return new Response(JSON.stringify({ ok: false, error: 'offline' }),
-          { headers: { 'Content-Type': 'application/json' } });
-      })
-    );
     return;
   }
   // config.js network-first: always try to fetch the latest (so a newly
