@@ -137,12 +137,13 @@ async function loadPayroll() {
     const data = res.data || [];
 
     // Stats
-    let totalGross = 0, totalAdv = 0, totalNet = 0;
-    data.forEach(w => { totalGross += w.gross || 0; totalAdv += w.advance || 0; totalNet += w.net || 0; });
+    let totalGross = 0, totalAdv = 0, totalNet = 0, totalOt = 0;
+    data.forEach(w => { totalGross += w.gross || 0; totalAdv += w.advance || 0; totalNet += w.net || 0; totalOt += w.otPay || 0; });
 
     $('payStats').innerHTML = `
       <div class="a-stat"><div class="sk">Total Workers</div><div class="sv num">${data.length}</div></div>
       <div class="a-stat"><div class="sk">Gross Payroll</div><div class="sv num">${fmtMoney(totalGross)}</div></div>
+      <div class="a-stat"><div class="sk">Total OT</div><div class="sv num">${fmtMoney(totalOt)}</div></div>
       <div class="a-stat s-amber"><div class="sk">Total Advances</div><div class="sv num">${fmtMoney(totalAdv)}</div></div>
       <div class="a-stat"><div class="sk">Net Payroll</div><div class="sv num">${fmtMoney(totalNet)}</div></div>
     `;
@@ -151,15 +152,19 @@ async function loadPayroll() {
     // Table
     let thead = `<thead><tr>
       <th>Emp No.</th><th class="tc-name">Name</th><th>Days</th><th>Daily Rate</th>
-      <th>Gross</th><th>Advance</th><th>Net Pay</th>
+      <th>OT hrs</th><th>OT Pay</th><th>Bonus</th><th>Gross</th><th>Advance</th><th>Net Pay</th>
     </tr></thead>`;
     let tbody = '<tbody>';
     data.forEach(w => {
+      const flag = w.incomplete ? ` <span title="${w.incomplete} shift(s) with no clock-out — check the sheet" style="color:var(--amber,#d4920b)">⚠${w.incomplete}</span>` : '';
       tbody += `<tr>
         <td class="wno">${w.id}</td>
         <td class="tc-name">${w.name}</td>
-        <td class="tc-num">${w.days || 0}</td>
+        <td class="tc-num">${w.days || 0}${flag}</td>
         <td class="tc-num">${fmtMoney(w.dailySalary)}</td>
+        <td class="tc-num">${(w.otHours || 0)}</td>
+        <td class="tc-num">${fmtMoney(w.otPay)}</td>
+        <td class="tc-num">${fmtMoney(w.bonus)}</td>
         <td class="tc-gross tc-num">${fmtMoney(w.gross)}</td>
         <td class="tc-adv tc-num">${fmtMoney(w.advance)}</td>
         <td class="tc-net tc-num">${fmtMoney(w.net)}</td>
@@ -167,14 +172,16 @@ async function loadPayroll() {
     });
     tbody += '</tbody>';
     let tfoot = `<tfoot><tr>
-      <td colspan="4" style="text-align:right">TOTAL</td>
+      <td colspan="5" style="text-align:right">TOTAL</td>
+      <td class="tc-num">${fmtMoney(totalOt)}</td>
+      <td class="tc-num"></td>
       <td class="tc-num">${fmtMoney(totalGross)}</td>
       <td class="tc-num">${fmtMoney(totalAdv)}</td>
       <td class="tc-num">${fmtMoney(totalNet)}</td>
     </tr></tfoot>`;
     $('payTable').innerHTML = thead + tbody + tfoot;
   } catch (err) {
-    $('payTable').innerHTML = `<tbody><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:40px">Unable to load payroll data</td></tr></tbody>`;
+    $('payTable').innerHTML = `<tbody><tr><td colspan="10" style="text-align:center;color:var(--muted);padding:40px">Unable to load payroll data</td></tr></tbody>`;
     toast('Payroll load error: ' + err.message, true);
   }
 }
@@ -420,8 +427,8 @@ $('exportBtn').addEventListener('click', async function () {
   try {
     const res = await api({ action: 'getPayroll', month, year });
     if (!res.ok || !res.data) { toast('No data to export', true); return; }
-    const rows = [['Emp No.', 'Name', 'Days', 'Daily Rate', 'Gross', 'Advance', 'Net Pay']];
-    res.data.forEach(w => rows.push([w.id, w.name, w.days, w.dailySalary, w.gross, w.advance, w.net]));
+    const rows = [['Emp No.', 'Name', 'Days', 'Daily Rate', 'OT Hours', 'OT Pay', 'Bonus', 'Gross', 'Advance', 'Net Pay', 'No-clockout shifts']];
+    res.data.forEach(w => rows.push([w.id, w.name, w.days, w.dailySalary, w.otHours, w.otPay, w.bonus, w.gross, w.advance, w.net, w.incomplete || 0]));
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
     const a = document.createElement('a');
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
