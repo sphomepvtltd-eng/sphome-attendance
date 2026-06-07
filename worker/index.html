@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#060a06">
+<meta name="description" content="SP Home Interior — Worker Attendance">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SP Home">
+<meta name="mobile-web-app-capable" content="yes">
+<title>SP Home Interior — Worker</title>
+
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="192x192" href="../shared/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="../shared/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="../shared/icon-512.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #060a06; --bg-2: #0c120c; --surface: #111811; --surface-2: #18211a;
+  --line: #243026; --line-soft: #1d271e;
+  --green: #3e7b2d; --green-br: #4e983a; --green-glow: #5fb348; --green-dim: #2a5420;
+  --ink: #eaf2e8; --muted: #8a9a87; --muted-2: #5f6e5d;
+  --amber: #d4920b; --amber-bg: #2a2008; --red: #d65745; --red-bg: #2a1310; --blue: #4a8fc0;
+  --radius: 16px; --shadow: 0 8px 32px rgba(0,0,0,.5);
+  --green-grad: linear-gradient(135deg, #4e983a 0%, #3e7b2d 55%, #2f5e22 100%);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { overscroll-behavior-y: contain; }
+body { font-family: 'Sora', system-ui, sans-serif;
+  background: radial-gradient(700px 420px at 80% -10%, rgba(78,152,58,.14) 0%, transparent 60%), var(--bg);
+  color: var(--ink); -webkit-font-smoothing: antialiased; min-height: 100vh;
+  max-width: 520px; margin: 0 auto; padding: 0 16px 40px;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
+.num { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+.hidden { display: none !important; }
+select, input, button, textarea { font-family: inherit; }
+
+/* App bar */
+.appbar { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 12px;
+  padding: 14px 2px calc(14px + env(safe-area-inset-top)); padding-top: calc(14px + env(safe-area-inset-top));
+  background: linear-gradient(180deg, var(--bg) 70%, transparent); }
+.appbar img { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 10px rgba(78,152,58,.4)); }
+.appbar .ab-txt h1 { font-size: 16px; font-weight: 700; line-height: 1.1; }
+.appbar .ab-txt p { font-size: 11px; color: var(--green-br); font-weight: 600; margin-top: 2px; letter-spacing: .4px; }
+.appbar .sp { flex: 1; }
+
+/* Sync chip */
+.sync-bar { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
+  padding: 6px 11px; border-radius: 20px; border: 1px solid var(--line); background: var(--surface-2); }
+.sync-bar::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted-2); }
+.sync-bar.online { color: var(--green-glow); border-color: var(--green-dim); }
+.sync-bar.online::before { background: var(--green-glow); box-shadow: 0 0 8px var(--green-glow); }
+.sync-bar.offline { color: var(--amber); border-color: #4a3a10; }
+.sync-bar.offline::before { background: var(--amber); }
+
+/* Cards */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
+.card-lbl { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+
+/* Live clock */
+.clock-card { text-align: center; background: linear-gradient(160deg, var(--surface-2), var(--surface)); }
+.clock-time { font-family: 'JetBrains Mono'; font-size: 44px; font-weight: 700; letter-spacing: 1px; color: var(--ink); }
+.clock-date { font-size: 13px; color: var(--green-br); font-weight: 600; margin-top: 4px; }
+
+/* Worker select */
+.wsel { width: 100%; background: var(--surface-2); color: var(--ink); border: 1.5px solid var(--line);
+  padding: 14px 13px; border-radius: 12px; font-size: 15px; font-weight: 600; outline: none; }
+.wsel:focus { border-color: var(--green-br); }
+.wsel option { background: #18211a; color: #eaf2e8; }
+
+/* Status banner */
+.status-banner { display: flex; align-items: center; gap: 13px; padding: 16px; border-radius: 14px;
+  background: var(--surface-2); border: 1px solid var(--line); margin-bottom: 14px; }
+.status-banner .sdot { width: 12px; height: 12px; border-radius: 50%; background: var(--muted-2); flex: none; }
+.status-banner.clocked-in { border-color: var(--green-dim); background: rgba(78,152,58,.10); }
+.status-banner.clocked-in .sdot { background: var(--green-glow); box-shadow: 0 0 10px var(--green-glow); }
+.status-banner .stt-main { font-size: 15px; font-weight: 700; }
+.status-banner .stt-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* Selfie zone */
+.selfie-zone { position: relative; width: 100%; aspect-ratio: 1; border-radius: 16px; overflow: hidden;
+  background: var(--bg-2); border: 1.5px dashed var(--line); display: grid; place-items: center; margin-bottom: 12px; }
+.selfie-zone.live { border-style: solid; border-color: var(--green-dim); }
+.selfie-zone video, .selfie-zone img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.selfie-ph { text-align: center; color: var(--muted); font-size: 13px; padding: 20px; }
+.selfie-ph .ico { font-size: 40px; display: block; margin-bottom: 8px; }
+.loc-chip { position: absolute; left: 10px; bottom: 10px; z-index: 3; background: rgba(6,10,6,.78);
+  border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; font-size: 11px; color: var(--ink); backdrop-filter: blur(6px); }
+.loc-chip b { font-family: 'JetBrains Mono'; color: var(--green-glow); }
+
+.cam-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+
+/* Buttons */
+.btn { border: none; cursor: pointer; border-radius: 12px; font-weight: 700; font-size: 14px; padding: 13px 14px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; transition: transform .12s; font-family: inherit; }
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-green { background: var(--green-grad); color: #fff; box-shadow: 0 4px 14px rgba(62,123,45,.4); }
+.btn-ghost { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+.btn-red { background: var(--red-bg); color: var(--red); border: 1px solid #5a2820; }
+.btn-sm { font-size: 12px; padding: 11px 8px; }
+.btn-block { width: 100%; }
+
+.clock-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.clock-actions .btn { padding: 16px; font-size: 15px; }
+
+.quick-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+/* Advance inline */
+.field { margin-bottom: 11px; }
+.field label { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+.input, textarea.input, select.input { width: 100%; background: var(--surface-2); border: 1.5px solid var(--line);
+  color: var(--ink); border-radius: 11px; padding: 12px 13px; font-size: 14px; outline: none; }
+.input:focus { border-color: var(--green-br); }
+textarea.input { resize: vertical; min-height: 64px; }
+.input.num-in { font-family: 'JetBrains Mono'; font-weight: 600; }
+
+/* Modal (PIN) */
+.modal { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.72); display: flex;
+  align-items: center; justify-content: center; padding: 20px; animation: fade .2s; backdrop-filter: blur(4px); }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.modal-card { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 26px 22px;
+  width: 100%; max-width: 360px; text-align: center; box-shadow: var(--shadow); }
+.modal-card h3 { font-size: 18px; font-weight: 700; }
+.modal-card .who { font-size: 13px; color: var(--green-br); font-weight: 600; margin-top: 4px; }
+.pin-dots { display: flex; justify-content: center; gap: 14px; margin: 22px 0; }
+.pin-dot { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--line); transition: all .15s; }
+.pin-dot.filled { background: var(--green-glow); border-color: var(--green-glow); box-shadow: 0 0 8px var(--green-glow); }
+.pin-err { color: var(--red); font-size: 12.5px; font-weight: 600; min-height: 18px; margin-bottom: 10px; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pin-key { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); font-size: 22px;
+  font-weight: 700; font-family: 'JetBrains Mono'; padding: 16px 0; border-radius: 14px; cursor: pointer; transition: background .12s, transform .1s; }
+.pin-key:active { background: var(--green-dim); transform: scale(.95); }
+.pin-key.k-blank { background: transparent; border: none; cursor: default; }
+.modal-cancel { width: 100%; margin-top: 14px; background: transparent; border: none; color: var(--muted);
+  font-size: 14px; font-weight: 600; padding: 12px; cursor: pointer; }
+
+/* Bottom sheets */
+.sheet { position: fixed; inset: 0; z-index: 180; background: rgba(0,0,0,.6); display: flex; align-items: flex-end;
+  animation: fade .2s; }
+.sheet-card { background: var(--surface); border-top-left-radius: 24px; border-top-right-radius: 24px;
+  border-top: 1px solid var(--line); width: 100%; max-width: 520px; margin: 0 auto; padding: 22px 18px;
+  padding-bottom: calc(22px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto;
+  animation: slideUp .26s cubic-bezier(.2,.8,.25,1); }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-head { display: flex; align-items: center; margin-bottom: 16px; }
+.sheet-head h3 { font-size: 17px; font-weight: 700; flex: 1; }
+.sheet-x { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); width: 36px; height: 36px;
+  border-radius: 50%; font-size: 18px; cursor: pointer; }
+
+/* Records */
+.rec-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.rec-tab { flex: 1; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted);
+  padding: 10px; border-radius: 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.rec-tab.on { background: var(--green-grad); color: #fff; border-color: transparent; }
+.act-item { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 12px; margin-bottom: 9px; }
+.act-ico { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-size: 17px; flex: none;
+  background: rgba(78,152,58,.14); }
+.act-ico.ai-leave { background: rgba(212,146,11,.14); }
+.act-ico.ai-adv { background: rgba(74,143,192,.14); }
+.act-mid { flex: 1; min-width: 0; }
+.act-title { font-size: 13.5px; font-weight: 700; }
+.act-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.act-badge { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 20px; text-transform: capitalize; }
+.badge-pending { background: var(--amber-bg); color: var(--amber); }
+.badge-approved, .badge-in { background: rgba(78,152,58,.16); color: var(--green-glow); }
+.badge-rejected, .badge-out { background: var(--red-bg); color: var(--red); }
+.empty-msg { text-align: center; padding: 36px 20px; color: var(--muted); font-size: 13px; }
+
+/* Toast */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--surface-2); border: 1px solid var(--green-dim); color: var(--ink); padding: 13px 22px; border-radius: 13px;
+  font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: all .3s; z-index: 300;
+  max-width: 90%; text-align: center; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { border-color: #5a2820; }
+</style>
+</head>
+<body>
+
+<!-- App bar -->
+<header class="appbar">
+  <img id="wLogo" alt="SP Home Interior">
+  <div class="ab-txt">
+    <h1>SP Home Interior</h1>
+    <p>WORKER ATTENDANCE</p>
+  </div>
+  <span class="sp"></span>
+  <span class="sync-bar offline" id="syncBar"><span class="sync-txt">Offline mode</span></span>
+</header>
+
+<!-- Live clock -->
+<div class="card clock-card">
+  <div class="clock-time num" id="clockTime">00:00:00</div>
+  <div class="clock-date" id="clockDate">—</div>
+</div>
+
+<!-- Worker select -->
+<div class="card">
+  <div class="card-lbl">Select your name</div>
+  <select class="wsel" id="workerSel" aria-label="Select Worker">
+    <option value="">— Select Worker —</option>
+  </select>
+</div>
+
+<!-- Worker section -->
+<section id="workerSection" class="hidden">
+
+  <!-- Status -->
+  <div class="status-banner" id="statusBanner">
+    <span class="sdot"></span>
+    <div>
+      <div class="stt-main">⚪ Not Clocked In</div>
+      <div class="stt-sub">Tap Clock In to start</div>
+    </div>
+  </div>
+
+  <!-- Selfie + camera -->
+  <div class="card">
+    <div class="card-lbl">Take your photo</div>
+    <div class="selfie-zone" id="selfieZone">
+      <div class="selfie-ph" id="selfiePh">
+        <span class="ico">📷</span>
+        Tap "Open Camera" to take a selfie before clocking in or out
+      </div>
+      <video id="wVideo" class="hidden" playsinline autoplay muted></video>
+      <img id="wPreview" class="hidden" alt="Captured selfie">
+      <div class="loc-chip hidden" id="locChip"><span class="loc-txt">📍 Location off</span></div>
+    </div>
+    <div class="cam-row">
+      <button class="btn btn-ghost btn-sm" id="btnCamera">📷 Open</button>
+      <button class="btn btn-green btn-sm" id="btnCapture" disabled>📸 Capture</button>
+      <button class="btn btn-ghost btn-sm" id="btnRetake" disabled>↻ Retake</button>
+      <button class="btn btn-ghost btn-sm" id="btnCamToggle" disabled>🔄 Flip</button>
+    </div>
+
+    <!-- Clock buttons -->
+    <div class="clock-actions">
+      <button class="btn btn-green" id="btnClockIn">🟢 Clock In</button>
+      <button class="btn btn-red" id="btnClockOut" disabled>🔴 Clock Out</button>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="quick-row">
+      <button class="btn btn-ghost btn-sm" id="btnRecords">📋 Records</button>
+      <button class="btn btn-ghost btn-sm" id="btnLeave">🌿 Leave</button>
+      <button class="btn btn-ghost btn-sm" id="btnChangePin">🔒 PIN</button>
+    </div>
+  </div>
+
+  <!-- Advance request -->
+  <div class="card">
+    <div class="card-lbl">💰 Request Salary Advance</div>
+    <div class="field">
+      <label for="advanceAmount">Amount (Rs.)</label>
+      <input class="input num-in" type="number" id="advanceAmount" inputmode="numeric" placeholder="0" min="0">
+    </div>
+    <div class="field">
+      <label for="advanceReason">Reason (optional)</label>
+      <input class="input" type="text" id="advanceReason" placeholder="Why do you need the advance?">
+    </div>
+    <button class="btn btn-green btn-block" id="btnAdvanceSubmit">Send Advance Request</button>
+  </div>
+
+</section>
+
+<!-- PIN MODAL -->
+<div class="modal hidden" id="pinModal" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <h3>Enter PIN</h3>
+    <div class="who" id="pinWorkerLbl"></div>
+    <div class="pin-dots">
+      <span class="pin-dot"></span><span class="pin-dot"></span>
+      <span class="pin-dot"></span><span class="pin-dot"></span>
+    </div>
+    <div class="pin-err" id="pinError"></div>
+    <div class="keypad">
+      <button class="pin-key" data-key="1">1</button>
+      <button class="pin-key" data-key="2">2</button>
+      <button class="pin-key" data-key="3">3</button>
+      <button class="pin-key" data-key="4">4</button>
+      <button class="pin-key" data-key="5">5</button>
+      <button class="pin-key" data-key="6">6</button>
+      <button class="pin-key" data-key="7">7</button>
+      <button class="pin-key" data-key="8">8</button>
+      <button class="pin-key" data-key="9">9</button>
+      <button class="pin-key k-blank" disabled></button>
+      <button class="pin-key" data-key="0">0</button>
+      <button class="pin-key" data-key="del">⌫</button>
+    </div>
+    <button class="modal-cancel" id="pinCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- CHANGE PIN SHEET -->
+<div class="sheet hidden" id="changePinSheet" role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <h3>🔒 Change PIN</h3>
+      <button class="sheet-x" id="closePinSheet" aria-label="Close">×</button>
+    </div>
+    <div class="field">
+      <label for="oldPinInput">Current PIN</label>
+      <input class="input num-in" type="password" id="oldPinInput" inputmode="numeric" maxlength="4" placeholder="••••">
+    </div>
+    <div class="field">
+      <label for="newPinInput">New PIN (4 digits)</label>
+      <input class="input num-in" type="password" id="newPinInput" inputmode="numeric" maxlength="4" placeholder="••••">
+    </div>
+    <div class="field">
+      <label for="confirmPinInput">Confirm New PIN</label>
+      <input class="input num-in" type="password" id="confirmPinInput" inputmode="numeric" maxlength="4" placeholder="••••">
+    </div>
+    <div class="pin-err" id="changePinError"></div>
+    <button class="btn btn-green btn-block" id="submitPinChange">Update PIN</button>
+  </div>
+</div>
+
+<!-- LEAVE SHEET -->
+<div class="sheet hidden" id="leaveSheet" role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <h3>🌿 Request Leave</h3>
+      <button class="sheet-x" id="closeLeaveSheet" aria-label="Close">×</button>
+    </div>
+    <div class="field">
+      <label for="leaveType">Leave type</label>
+      <select class="input" id="leaveType">
+        <option value="Casual">Casual Leave</option>
+        <option value="Sick">Sick Leave</option>
+        <option value="Annual">Annual Leave</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="leaveFrom">From</label>
+      <input class="input" type="date" id="leaveFrom">
+    </div>
+    <div class="field">
+      <label for="leaveTo">To</label>
+      <input class="input" type="date" id="leaveTo">
+    </div>
+    <div class="field">
+      <label for="leaveReason">Reason</label>
+      <textarea class="input" id="leaveReason" placeholder="Reason for leave"></textarea>
+    </div>
+    <button class="btn btn-green btn-block" id="submitLeave">Send Leave Request</button>
+  </div>
+</div>
+
+<!-- RECORDS SHEET -->
+<div class="sheet hidden" id="recordsSheet" role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <h3>📋 My Records</h3>
+      <button class="sheet-x" id="closeRecordsSheet" aria-label="Close">×</button>
+    </div>
+    <div class="rec-tabs">
+      <button class="rec-tab on" data-tab="attendance">Attendance</button>
+      <button class="rec-tab" data-tab="leaves">Leaves</button>
+      <button class="rec-tab" data-tab="advances">Advances</button>
+    </div>
+    <div id="recordsContent">
+      <div class="empty-msg">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Script load order: config → logo → app -->
+<script src="../shared/config.js"></script>
+<script src="../shared/logo.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
