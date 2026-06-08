@@ -122,6 +122,7 @@ function refreshCurrentTab() {
     case 'requests':   loadRequests();   break;
     case 'proof':      loadProof();      break;
     case 'settings':   loadSettings();   break;
+    case 'messages':   loadMessagesAdmin(); break;
   }
 }
 
@@ -259,8 +260,8 @@ async function loadRequests() {
         </div>
         ${r.status === 'pending' ? `
           <div class="rq-actions">
-            <button class="rq-approve" onclick="handleRequest('${r.id}','approved')">✓ Approve</button>
-            <button class="rq-reject" onclick="handleRequest('${r.id}','rejected')">✕ Reject</button>
+            <button class="rq-approve" onclick="handleRequest('${r.id}','approved','${r.type}',${Number(r.amount) || 0})">✓ Approve</button>
+            <button class="rq-reject" onclick="handleRequest('${r.id}','rejected','${r.type}',0)">✕ Reject</button>
           </div>` : ''}
       </div>
     `).join('');
@@ -269,9 +270,18 @@ async function loadRequests() {
   }
 }
 
-async function handleRequest(id, status) {
+async function handleRequest(id, status, type, amount) {
+  let approvedAmount;
+  if (status === 'approved' && type === 'advance') {
+    const input = window.prompt('Approve advance — enter the amount to approve (Rs.). Edit for a partial amount:', amount || 0);
+    if (input === null) return; // cancelled
+    approvedAmount = Number(input);
+    if (isNaN(approvedAmount) || approvedAmount < 0) { toast('Invalid amount', true); return; }
+  }
   try {
-    const res = await apiPost({ action: 'updateRequest', requestId: id, status });
+    const payload = { action: 'updateRequest', requestId: id, status: status };
+    if (approvedAmount !== undefined) payload.approvedAmount = approvedAmount;
+    const res = await apiPost(payload);
     if (res.ok) { toast(status === 'approved' ? '✅ Approved' : '✕ Rejected'); loadRequests(); }
     else { toast(res.error || 'Failed', true); }
   } catch (_) { toast('Network error', true); }
@@ -457,4 +467,59 @@ document.addEventListener('DOMContentLoaded', function () {
   // auto-focus pin input
   const pi = $('pinInput');
   if (pi) pi.focus();
+});
+
+/* ── Messaging (admin → workers) ── */
+async function loadMessagesAdmin() {
+  const sel = document.getElementById('msgTarget');
+  if (sel) {
+    let workers = Admin.workers;
+    if (!workers || !workers.length) {
+      try { const r = await api({ action: 'getWorkers' }); if (r.ok) workers = r.data; } catch (_) {}
+    }
+    sel.innerHTML = '<option value="all">📢 All workers</option>' +
+      (workers || []).map(w => `<option value="${w.id}">👤 ${w.id} — ${w.name}</option>`).join('');
+  }
+  loadSentMessages();
+}
+
+async function loadSentMessages() {
+  const list = document.getElementById('msgSentList');
+  if (!list) return;
+  list.innerHTML = '<div class="empty-msg">Loading…</div>';
+  try {
+    const res = await api({ action: 'getMessages' });
+    const data = (res && res.ok && res.data) || [];
+    if (!data.length) { list.innerHTML = '<div class="empty-msg">No messages sent yet</div>'; return; }
+    list.innerHTML = data.map(m => `
+      <div class="msg-row">
+        <div class="mr-to">${m.target === 'all' ? '📢 All workers' : '👤 ' + escapeHtmlA(m.targetName || m.target)}</div>
+        <div class="mr-txt">${escapeHtmlA(m.text)}</div>
+        <div class="mr-date">${m.ts ? new Date(m.ts).toLocaleString() : ''}</div>
+      </div>`).join('');
+  } catch (_) { list.innerHTML = '<div class="empty-msg">Unable to load messages</div>'; }
+}
+
+function escapeHtmlA(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+document.addEventListener('click', async function (e) {
+  if (e.target && e.target.id === 'msgSendBtn') {
+    const target = document.getElementById('msgTarget').value || 'all';
+    const text = (document.getElementById('msgText').value || '').trim();
+    if (!text) { toast('Type a message first', true); return; }
+    let targetName = 'All workers';
+    if (target !== 'all') {
+      const o = document.getElementById('msgTarget').selectedOptions[0];
+      targetName = o ? o.textContent.replace('👤 ', '') : target;
+    }
+    e.target.disabled = true;
+    try {
+      const res = await apiPost({ action: 'sendMessage', target: target, targetName: targetName, text: text });
+      if (res.ok) { toast('✅ Message sent'); document.getElementById('msgText').value = ''; loadSentMessages(); }
+      else { toast(res.error || 'Failed', true); }
+    } catch (_) { toast('Network error', true); }
+    e.target.disabled = false;
+  }
 });

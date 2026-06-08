@@ -2,7 +2,7 @@
 //  SP HOME INTERIOR — ADMIN SERVICE WORKER
 //  Scope: /admin/
 // ═══════════════════════════════════════════════════
-const CACHE = 'sphome-admin-v5';
+const CACHE = 'sphome-admin-v6';
 const ASSETS = [
   './',
   './index.html',

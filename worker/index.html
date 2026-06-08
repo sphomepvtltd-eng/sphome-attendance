@@ -238,6 +238,11 @@ textarea.input { resize: vertical; min-height: 64px; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.err { border-color: #5a2820; box-shadow: var(--shadow); }
 
+.adv-earned { background: rgba(121,232,92,.1); border: 1px solid var(--green-dim); color: var(--ink); font-size: 13px; padding: 10px 12px; border-radius: 11px; margin-bottom: 12px; }
+.adv-earned b { color: var(--green-glow); font-family: 'JetBrains Mono'; }
+.msg-item { background: var(--surface-2); border: 1px solid var(--line); border-left: 3px solid var(--green-br); border-radius: 11px; padding: 11px 13px; margin-bottom: 9px; }
+.msg-item .msg-txt { font-size: 13.5px; color: var(--ink); line-height: 1.45; }
+.msg-item .msg-meta { font-size: 11px; color: var(--muted); margin-top: 5px; }
 </style>
 </head>
 <body>
@@ -279,6 +284,12 @@ textarea.input { resize: vertical; min-height: 64px; }
     </div>
   </div>
 
+  <!-- Messages from admin -->
+  <div class="card hidden" id="msgCard">
+    <div class="card-lbl">📢 Messages</div>
+    <div id="msgList"></div>
+  </div>
+
   <!-- Selfie + camera -->
   <div class="card">
     <div class="card-lbl">Take your photo</div>
@@ -315,6 +326,7 @@ textarea.input { resize: vertical; min-height: 64px; }
   <!-- Advance request -->
   <div class="card">
     <div class="card-lbl">💰 Request Salary Advance</div>
+    <div class="adv-earned" id="advanceEarnedWrap">This month earned so far: <b id="advanceEarned">…</b></div>
     <div class="field">
       <label for="advanceAmount">Amount (Rs.)</label>
       <input class="input num-in" type="number" id="advanceAmount" inputmode="numeric" placeholder="0" min="0">

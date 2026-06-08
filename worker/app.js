@@ -28,6 +28,7 @@ const App = {
   capturedBlob: null,
   coords: null,
   online: navigator.onLine,
+  authed: false,
   offlineQueue: [],
 };
 
@@ -174,9 +175,10 @@ function loadWorkers() {
 $('workerSel').addEventListener('change', function () {
   const id = this.value;
   App.worker = App.workers.find(w => w.id === id) || null;
-  $('workerSection').classList.toggle('hidden', !App.worker);
+  App.authed = false;
+  $('workerSection').classList.add('hidden');
   if (App.worker) {
-    checkStatus();
+    openPin('login'); // enter PIN to continue
   }
 });
 
@@ -318,19 +320,16 @@ let pinBuffer = '';
 let pinTarget = null; // 'clockIn' | 'clockOut'
 
 function openPin(target) {
-  if (!App.capturedBlob && target === 'clockIn') {
-    toast('Please take a selfie photo first', true);
-    return;
-  }
-  if (!App.capturedBlob && target === 'clockOut') {
-    toast('Please take a clock-out photo first', true);
+  // 'login' = unlock gate (no photo needed). Clock targets require a photo.
+  if (target !== 'login' && !App.capturedBlob) {
+    toast('Please take a photo first', true);
     return;
   }
   pinTarget = target;
   pinBuffer = '';
   renderPinDots();
   $('pinError').textContent = '';
-  $('pinWorkerLbl').textContent = App.worker ? App.worker.name : '';
+  $('pinWorkerLbl').textContent = App.worker ? (App.worker.id + ' · ' + App.worker.name) : '';
   $('pinModal').classList.remove('hidden');
 }
 
@@ -401,6 +400,7 @@ async function submitPin() {
 }
 
 async function executeClock() {
+  if (pinTarget === 'login') { unlockWorker(); return; }
   closePinModal();
   const ts = new Date().toISOString();
   const type = pinTarget; // 'clockIn' | 'clockOut'
@@ -459,8 +459,65 @@ async function executeClock() {
   }
 }
 
-$('btnClockIn').addEventListener('click', () => openPin('clockIn'));
-$('btnClockOut').addEventListener('click', () => openPin('clockOut'));
+$('btnClockIn').addEventListener('click', () => doClock('clockIn'));
+$('btnClockOut').addEventListener('click', () => doClock('clockOut'));
+
+// After PIN login, reveal the worker section and load status + pay + messages.
+function unlockWorker() {
+  App.authed = true;
+  closePinModal();
+  $('workerSection').classList.remove('hidden');
+  checkStatus();
+  loadMyPay();
+  loadMessages();
+}
+
+// Clock in/out without re-asking PIN (worker already logged in this session).
+function doClock(type) {
+  if (!App.worker || !App.authed) { toast('Select your name and enter PIN first', true); return; }
+  if (!App.capturedBlob) { toast('Please take a photo first', true); return; }
+  pinTarget = type;
+  executeClock();
+}
+
+// Show this month's earned salary on the advance card.
+function loadMyPay() {
+  const el = $('advanceEarned');
+  if (!el || !App.worker) return;
+  if (!App.online) { el.textContent = 'connect to view'; return; }
+  el.textContent = 'loading…';
+  api({ action: 'getMyPay', workerId: App.worker.id }).then(res => {
+    if (res && res.ok) {
+      el.textContent = 'Rs. ' + Number(res.net || 0).toLocaleString() +
+        '  (' + (res.days || 0) + ' days' + (res.advance ? ', advance Rs. ' + Number(res.advance).toLocaleString() + ' taken' : '') + ')';
+    } else { el.textContent = '—'; }
+  }).catch(() => { el.textContent = '—'; });
+}
+
+// Show messages from admin (broadcast + personal).
+function loadMessages() {
+  const card = $('msgCard'), list = $('msgList');
+  if (!card || !list || !App.worker) return;
+  if (!App.online) { card.classList.add('hidden'); return; }
+  api({ action: 'getMessages', workerId: App.worker.id }).then(res => {
+    if (res && res.ok && Array.isArray(res.data) && res.data.length) {
+      list.innerHTML = res.data.map(m =>
+        '<div class="msg-item"><div class="msg-txt">' + escapeHtml(m.text) + '</div>' +
+        '<div class="msg-meta">' + (m.target === 'all' ? '📢 All workers' : '👤 To you') + ' · ' + fmtMsgDate(m.ts) + '</div></div>'
+      ).join('');
+      card.classList.remove('hidden');
+    } else {
+      card.classList.add('hidden');
+    }
+  }).catch(() => card.classList.add('hidden'));
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function fmtMsgDate(iso) {
+  try { return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' }); } catch (_) { return ''; }
+}
 
 // Keypad
 document.querySelectorAll('.pin-key').forEach(btn => {

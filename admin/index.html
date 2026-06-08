@@ -180,6 +180,16 @@ td.tc-in { color: var(--green-glow); } td.tc-miss { color: var(--muted-2); }
 
 .pin-reset-btn { background: var(--amber-bg); color: var(--amber-2); border: 1px solid var(--amber); border-radius: 7px; padding: 5px 10px; cursor: pointer; font-size: 12px; font-weight: 600; transition: background .2s; white-space: nowrap; }
 .pin-reset-btn:hover { background: var(--amber); color: #000; }
+.msg-compose{max-width:620px;background:var(--surface,#0f160f);border:1px solid var(--line,#26331f);border-radius:14px;padding:18px;margin-bottom:24px}
+.mc-field{margin-bottom:14px}
+.mc-field label{display:block;font-size:12px;color:var(--muted,#8da389);font-weight:600;margin-bottom:6px}
+.m-input{width:100%;background:var(--surface-2,#161f16);border:1.5px solid var(--line,#26331f);color:var(--ink,#eef5ec);border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none}
+.m-input:focus{border-color:var(--green-br,#57ad3f)}
+.msg-sent-h{font-size:14px;color:var(--muted,#8da389);font-weight:600;margin:0 0 12px}
+.msg-row{background:var(--surface-2,#161f16);border:1px solid var(--line,#26331f);border-left:3px solid var(--green-br,#57ad3f);border-radius:10px;padding:11px 13px;margin-bottom:9px;max-width:620px}
+.msg-row .mr-to{font-size:11px;color:var(--green-glow,#79e85c);font-weight:700;margin-bottom:3px}
+.msg-row .mr-txt{font-size:13.5px;color:var(--ink,#eef5ec)}
+.msg-row .mr-date{font-size:11px;color:var(--muted,#8da389);margin-top:4px}
 </style>
 </head>
 <body>
@@ -220,6 +230,7 @@ td.tc-in { color: var(--green-glow); } td.tc-miss { color: var(--muted-2); }
     <button class="tab" data-tab="requests">📨 Requests <span class="cnt zero" id="reqCnt">0</span></button>
     <button class="tab" data-tab="proof">📸 Photo Proof</button>
     <button class="tab" data-tab="settings">⚙ Workers</button>
+    <button class="tab" data-tab="messages">📢 Messages</button>
   </div>
 
   <main>
@@ -297,6 +308,28 @@ td.tc-in { color: var(--green-glow); } td.tc-miss { color: var(--muted-2); }
           <tbody id="wtableBody"></tbody>
         </table>
       </div>
+    </section>
+
+    <section id="t-messages" class="panel hidden">
+      <div class="panel-head">
+        <h2>📢 Send Message</h2>
+        <span class="sub">Broadcast to all workers, or message one worker</span>
+      </div>
+      <div class="msg-compose">
+        <div class="mc-field">
+          <label>To</label>
+          <select id="msgTarget" class="m-input">
+            <option value="all">📢 All workers</option>
+          </select>
+        </div>
+        <div class="mc-field">
+          <label>Message</label>
+          <textarea id="msgText" class="m-input" rows="3" placeholder="Type your message…"></textarea>
+        </div>
+        <button class="btn btn-green" id="msgSendBtn">Send Message</button>
+      </div>
+      <h3 class="msg-sent-h">Recent messages</h3>
+      <div id="msgSentList"></div>
     </section>
 
   </main>
