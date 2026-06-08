@@ -191,6 +191,8 @@ function checkStatus() {
       App.clockedIn = res.clockedIn;
       App.clockInTime = res.clockInTime || null;
       renderStatus(res.clockedIn, res.clockInTime);
+    } else {
+      renderStatus(false, null); // server reachable but error → safe known state
     }
   }).catch(() => renderStatus(false, null));
 }
@@ -441,10 +443,19 @@ async function executeClock() {
       toast(res.error || 'Server error', true);
     }
   } catch (_) {
-    queueAction(payload);
-    renderStatus(type === 'clockIn', ts);
-    App.capturedBlob = null;
-    toast(type === 'clockIn' ? '🕐 Clocked In (offline)' : '🕕 Clocked Out (offline)');
+    if (!App.online) {
+      queueAction(payload);
+      renderStatus(type === 'clockIn', ts);
+      App.capturedBlob = null;
+      $('wPreview').classList.add('hidden');
+      $('selfiePh').classList.remove('hidden');
+      toast(type === 'clockIn' ? '🕐 Clocked In (offline)' : '🕕 Clocked Out (offline)');
+    } else {
+      // Online but the request failed — do NOT fake success. Show the real
+      // problem and re-sync the true status from the server.
+      toast('⚠️ Could not reach server. Check connection and try again.', true);
+      checkStatus();
+    }
   }
 }
 

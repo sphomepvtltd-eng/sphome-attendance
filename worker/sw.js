@@ -2,7 +2,7 @@
 //  SP HOME INTERIOR — WORKER SERVICE WORKER
 //  Scope: /worker/
 // ═══════════════════════════════════════════════════
-const CACHE = 'sphome-worker-v5';
+const CACHE = 'sphome-worker-v6';
 const ASSETS = [
   './',
   './index.html',
