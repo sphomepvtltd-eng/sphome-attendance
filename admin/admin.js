@@ -20,7 +20,9 @@ const Admin = {
   pendingRequests: 0,
   currentTab: 'payroll',
   selectorsReady: false,
-  seq: { payroll: 0, attendance: 0, requests: 0, proof: 0 },
+  seq: { payroll: 0, attendance: 0, requests: 0, proof: 0, memos: 0, profiles: 0 },
+  slip: null,
+  transfer: null,
 };
 
 const API = (typeof CONFIG !== 'undefined' && CONFIG.BACKEND_URL) || '';
@@ -108,6 +110,8 @@ function logout(msg) {
   Admin.loggedIn = false;
   Admin.pin = '';
   Admin.workersLoaded = false;
+  Admin.slip = null; Admin.transfer = null;
+  $('docModal').classList.add('hidden');
   $('adminApp').classList.add('hidden');
   $('loginScreen').classList.remove('hidden');
   $('pinInput').value = '';
@@ -160,6 +164,8 @@ function refreshCurrentTab() {
     case 'attendance': loadAttendance(); break;
     case 'requests':   loadRequests();   break;
     case 'proof':      loadProof();      break;
+    case 'memos':      loadMemos();      break;
+    case 'profiles':   loadProfiles();   break;
     case 'settings':   loadWorkers();    break;
   }
 }
@@ -169,6 +175,7 @@ async function loadPayroll() {
   const { month, year } = getMonthYear();
   const my = ++Admin.seq.payroll;
   $('payTitle').textContent = `Payroll — ${MONTHS[month - 1] || ''} ${year}`;
+  $('payDue').textContent = 'Salary period 1–' + new Date(year, month, 0).getDate() + ' ' + (MONTHS[month - 1] || '') + ' · pay by ' + SPPDF.fmtDate(dueDate(month, year));
 
   try {
     const res = await call('getPayroll', { month: month, year: year });
@@ -188,12 +195,12 @@ async function loadPayroll() {
       <div class="a-stat"><div class="sk">Gross Payroll</div><div class="sv num">${fmtMoney(T.gross)}</div></div>
       <div class="a-stat"><div class="sk">Total OT</div><div class="sv num">${fmtMoney(T.ot)}</div></div>
       <div class="a-stat s-amber"><div class="sk">Total Advances</div><div class="sv num">${fmtMoney(T.adv)}</div></div>
-      <div class="a-stat"><div class="sk">Net Payroll</div><div class="sv num">${fmtMoney(T.net)}</div></div>`;
+      <div class="a-stat"><div class="sk">To Pay (Net)</div><div class="sv num">${fmtMoney(T.net)}</div></div>`;
     $('paySub').textContent = `${data.length} workers`;
 
     const thead = `<thead><tr>
       <th>Emp No.</th><th class="tc-name">Name</th><th>Days</th><th>Daily Rate</th><th>Basic</th>
-      <th>OT hrs</th><th>OT Pay</th><th>Short-day Pay</th><th>Bonus</th><th>Gross</th><th>Advance</th><th>Net Pay</th>
+      <th>OT hrs</th><th>OT Pay</th><th>Short-day Pay</th><th>Bonus</th><th>Gross</th><th>Advance</th><th>Net Pay</th><th>Payslip</th>
     </tr></thead>`;
     const tbody = '<tbody>' + data.map(w => {
       const flag = w.incomplete
@@ -211,6 +218,7 @@ async function loadPayroll() {
         <td class="tc-gross tc-num">${fmtMoney(w.gross)}</td>
         <td class="tc-adv tc-num">${fmtMoney(w.advance)}</td>
         <td class="tc-net tc-num">${fmtMoney(w.net)}</td>
+        <td><button class="slip-btn" data-act="slip" data-id="${esc(w.id)}" title="Payslip for ${esc(w.name)}">📄 Payslip</button></td>
       </tr>`;
     }).join('') + '</tbody>';
     const tfoot = `<tfoot><tr>
@@ -223,11 +231,12 @@ async function loadPayroll() {
       <td class="tc-num">${fmtMoney(T.gross)}</td>
       <td class="tc-num">${fmtMoney(T.adv)}</td>
       <td class="tc-num">${fmtMoney(T.net)}</td>
+      <td></td>
     </tr></tfoot>`;
     $('payTable').innerHTML = thead + tbody + tfoot;
   } catch (err) {
     if (my !== Admin.seq.payroll || !Admin.loggedIn) return;
-    $('payTable').innerHTML = '<tbody><tr><td colspan="12" style="text-align:center;color:var(--muted);padding:40px">Unable to load payroll data</td></tr></tbody>';
+    $('payTable').innerHTML = '<tbody><tr><td colspan="13" style="text-align:center;color:var(--muted);padding:40px">Unable to load payroll data</td></tr></tbody>';
     toast('Payroll load error: ' + err.message, true);
   }
 }
@@ -399,6 +408,323 @@ function openLightbox(url, name, ts, type) {
 $('lbClose').addEventListener('click', () => $('lightbox').classList.add('hidden'));
 $('lightbox').addEventListener('click', function (e) { if (e.target === this) $('lightbox').classList.add('hidden'); });
 
+
+/* ── Payslips, bank transfer, worker details ── */
+function dueDate(month, year) {            // salary for month M is paid by the 10th of M+1
+  const ny = month === 12 ? year + 1 : year, nm = month === 12 ? 1 : month + 1;
+  return ny + '-' + String(nm).padStart(2, '0') + '-10';
+}
+function todayYmd() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function saveBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+function openModal(title, bodyHtml, buttons) {
+  $('docTitle').textContent = title;
+  $('docBody').innerHTML = bodyHtml;
+  const foot = $('docFoot');
+  foot.innerHTML = '';
+  buttons.forEach(b => {
+    const el = document.createElement('button');
+    el.className = 'btn ' + (b.cls || 'btn-ghost');
+    el.textContent = b.label;
+    el.disabled = !!b.disabled;
+    el.addEventListener('click', () => b.fn(el));
+    foot.appendChild(el);
+  });
+  $('docModal').classList.remove('hidden');
+}
+function closeModal() { $('docModal').classList.add('hidden'); Admin.slip = null; Admin.transfer = null; }
+$('docClose').addEventListener('click', closeModal);
+$('docModal').addEventListener('click', e => { if (e.target === $('docModal')) closeModal(); });
+
+function pdfReady() {
+  if (!window.SPPDF || !window.jspdf) { toast('PDF library did not load — refresh the page', true); return false; }
+  return true;
+}
+
+$('payTable').addEventListener('click', function (e) {
+  const b = e.target.closest('button[data-act="slip"]');
+  if (b) openSlip(b.dataset.id, b);
+});
+
+async function openSlip(workerId, btn) {
+  if (!pdfReady()) return;
+  const { month, year } = getMonthYear();
+  if (btn) btn.disabled = true;
+  try {
+    const res = await call('getPaySheets', { month: month, year: year, workerId: workerId });
+    if (!res.ok || !res.sheets || !res.sheets.length) { toast(res.error || 'Could not load payslip', true); return; }
+    const sh = res.sheets[0];
+    Admin.slip = { data: res, sh: sh };
+    const phone = sh.phone ? '+' + esc(sh.phone) : '';
+    const rows = [
+      ['Full working days', esc(sh.days)], ['Day pay', fmtMoney(sh.basicPay)],
+      ['OT (' + esc(sh.otHours) + ' hrs)', fmtMoney(sh.otPay)], ['Short-day pay', fmtMoney(sh.shortPay)],
+      ['Attendance bonus', fmtMoney(sh.bonus)], ['Gross', fmtMoney(sh.gross)], ['Advances deducted', '− ' + fmtMoney(sh.advance)],
+    ].map(r => `<div class="mrow"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('');
+    openModal('Payslip — ' + sh.name + ' (' + sh.id + ')', `
+      <div class="mnote" style="margin:0 0 8px">${esc(SPPDF.monthName(res.month))} ${esc(res.year)} · ${esc(SPPDF.fmtDate(res.periodStart))} – ${esc(SPPDF.fmtDate(res.periodEnd))} · pay by ${esc(SPPDF.fmtDate(res.payDue))}</div>
+      ${rows}
+      <div class="mrow big"><span>NET PAY</span><span>${fmtMoney(sh.net)}</span></div>
+      <div class="mnote">The PDF also lists ${esc(sh.detail.length)} attendance row(s), ${esc(sh.advances.length)} advance(s) and ${esc(sh.leaves.length)} leave record(s).</div>
+      ${sh.incomplete ? `<div class="mwarn">⚠ ${esc(sh.incomplete)} shift(s) have no clock-out and are not paid. Fix them in the Sheet before sending.</div>` : ''}
+      ${phone ? `<div class="mnote">WhatsApp number: ${phone}</div>` : '<div class="mwarn">No phone number saved yet — the worker can add it in their app (My Details). You can still download the PDF or send it as an in-app notice.</div>'}
+    `, [
+      { label: '⬇ Download PDF', cls: 'btn-ghost', fn: () => slipDownload() },
+      { label: '💬 Send via WhatsApp', cls: 'btn-green', fn: () => slipWhatsApp() },
+      { label: '📨 Send in app', cls: 'btn-ghost', fn: el => slipNotice(el) },
+      { label: 'Close', cls: 'btn-ghost', fn: closeModal },
+    ]);
+  } catch (err) {
+    if (Admin.loggedIn) toast('Payslip error: ' + err.message, true);
+  } finally { if (btn) btn.disabled = false; }
+}
+
+function slipFileName() {
+  const d = Admin.slip.data, id = Admin.slip.sh.id;
+  return 'Payslip_' + id + '_' + d.year + '-' + String(d.month).padStart(2, '0') + '.pdf';
+}
+function slipDoc() {
+  const s = Admin.slip;
+  return SPPDF.payslipsDoc(Object.assign({}, s.data, { sheets: [s.sh] }));
+}
+function slipDownload() {
+  if (!Admin.slip) return;
+  try { slipDoc().save(slipFileName()); } catch (err) { toast('PDF error: ' + err.message, true); }
+}
+
+// Phones/PCs that support file sharing open the share sheet (choose WhatsApp). Otherwise the PDF is
+// downloaded and a WhatsApp chat with a short text is opened — the PDF must then be attached by hand.
+async function slipWhatsApp() {
+  if (!Admin.slip) return;
+  const s = Admin.slip, text = SPPDF.payslipText(s.sh, s.data);
+  let doc;
+  try { doc = slipDoc(); } catch (err) { toast('PDF error: ' + err.message, true); return; }
+  const name = slipFileName();
+  try {
+    const file = new File([doc.output('blob')], name, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Payslip', text: text });
+      return;
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;      // user closed the share sheet
+  }
+  doc.save(name);
+  if (s.sh.phone) window.open('https://wa.me/' + encodeURIComponent(s.sh.phone) + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
+  toast(s.sh.phone ? 'PDF downloaded — attach it in the WhatsApp chat that opened' : 'PDF downloaded — no phone number saved, open WhatsApp and attach it', false);
+}
+
+async function slipNotice(btn) {
+  if (!Admin.slip) return;
+  const s = Admin.slip;
+  if (!confirm('Send this payslip summary to ' + s.sh.name + ' as a private notice in the app?')) return;
+  btn.disabled = true;
+  try {
+    const res = await call('sendMemo', {
+      target: [s.sh.id], title: 'Payslip - ' + SPPDF.monthName(s.data.month) + ' ' + s.data.year,
+      message: SPPDF.payslipText(s.sh, s.data).slice(0, 500),
+    });
+    if (res.ok) toast('✅ Payslip sent to ' + s.sh.name + ' (Notices)'); else toast(res.error || 'Failed', true);
+  } catch (_) { toast('Network error — not sent', true); }
+  finally { btn.disabled = false; }
+}
+
+$('allSlipsBtn').addEventListener('click', async function () {
+  if (!pdfReady()) return;
+  const btn = this, { month, year } = getMonthYear();
+  btn.disabled = true;
+  try {
+    const res = await call('getPaySheets', { month: month, year: year });
+    if (!res.ok || !res.sheets || !res.sheets.length) { toast(res.error || 'No data', true); return; }
+    SPPDF.payslipsDoc(res).save('Payslips_' + year + '-' + String(month).padStart(2, '0') + '.pdf');
+    toast('✅ ' + res.sheets.length + ' payslips downloaded');
+  } catch (err) { if (Admin.loggedIn) toast('Payslip error: ' + err.message, true); }
+  finally { btn.disabled = false; }
+});
+
+$('transferBtn').addEventListener('click', async function () {
+  if (!pdfReady()) return;
+  const btn = this, { month, year } = getMonthYear();
+  btn.disabled = true;
+  try {
+    const res = await call('getTransferData', { month: month, year: year });
+    if (!res.ok) { toast(res.error || 'Failed', true); return; }
+    Admin.transfer = res;
+    const samp = res.lines.filter(l => /sampath/i.test(l.bankName)).length;
+    const lines = res.lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.accountName)}</td><td>${esc(l.bankName)}</td><td>${esc(l.branch)}</td><td>${esc(l.accountNo)}</td><td class="r">${fmtMoney(l.amount)}</td></tr>`).join('');
+    const exc = res.excluded.length ? `<div class="mwarn"><b>Not included (${res.excluded.length}):</b><br>${res.excluded.map(x => esc(x.name) + ' (' + esc(x.id) + ') — ' + esc(x.reason) + (x.reason === 'Bank details missing' ? ', net ' + fmtMoney(x.net) : '')).join('<br>')}</div>` : '';
+    const inc = res.lines.filter(l => l.incomplete).length;
+    openModal('Bank transfer — ' + SPPDF.monthName(res.month) + ' ' + res.year, `
+      <div class="mrow"><span>Debit account</span><span>${esc(res.company.name)} · ${esc(res.company.bank)} ${esc(res.company.branch)} · ${esc(res.company.account)}</span></div>
+      <div class="mrow"><span>Salary period</span><span>${esc(SPPDF.fmtDate(res.periodStart))} – ${esc(SPPDF.fmtDate(res.periodEnd))}</span></div>
+      <div class="mrow"><span>Pay on or before</span><span>${esc(SPPDF.fmtDate(res.payDue))}</span></div>
+      <div class="mrow"><span>Beneficiaries</span><span>${res.lines.length} (${samp} ${esc(res.company.bank)}, ${res.lines.length - samp} other banks)</span></div>
+      <div class="mrow big"><span>TOTAL TO TRANSFER</span><span>${fmtMoney(res.total)}</span></div>
+      ${inc ? `<div class="mwarn">⚠ ${inc} worker(s) below have shifts with no clock-out that are NOT in their amount. Fix the Sheet first if needed.</div>` : ''}
+      ${exc}
+      ${res.lines.length ? `<table class="mini-table"><thead><tr><th>#</th><th>Account holder</th><th>Bank</th><th>Branch</th><th>Account No.</th><th class="r">Amount</th></tr></thead><tbody>${lines}</tbody></table>` : '<div class="mnote">Nobody to pay yet for this month.</div>'}
+      <div class="mnote">Check this list before sending it to the bank. The CSV is a plain file; ask the branch whether Sampath's bulk-upload template needs different columns, and do not re-save the CSV in Excel (it drops leading zeros in account numbers).</div>
+    `, [
+      { label: '⬇ Letter to bank (PDF)', cls: 'btn-green', disabled: !res.lines.length, fn: () => transferPdf() },
+      { label: '⬇ CSV file', cls: 'btn-ghost', disabled: !res.lines.length, fn: () => transferCsv() },
+      { label: 'Close', cls: 'btn-ghost', fn: closeModal },
+    ]);
+  } catch (err) { if (Admin.loggedIn) toast('Transfer error: ' + err.message, true); }
+  finally { btn.disabled = false; }
+});
+
+function transferName(ext) { const t = Admin.transfer; return 'Salary_Transfer_' + t.year + '-' + String(t.month).padStart(2, '0') + '.' + ext; }
+function transferPdf() {
+  if (!Admin.transfer) return;
+  try { SPPDF.transferDoc(Admin.transfer, todayYmd()).save(transferName('pdf')); } catch (err) { toast('PDF error: ' + err.message, true); }
+}
+function transferCsv() {
+  if (!Admin.transfer) return;
+  saveBlob(new Blob([SPPDF.bankCsv(Admin.transfer)], { type: 'text/csv;charset=utf-8' }), transferName('csv'));
+}
+
+/* Worker details tab */
+function setProfBadge(n) { $('profCnt').textContent = n; $('profCnt').className = 'cnt' + (n === 0 ? ' zero' : ''); }
+async function refreshProfBadge() {
+  try { const res = await call('getProfilesAdmin'); if (res.ok) setProfBadge(res.pendingCount || 0); } catch (_) { /* cosmetic */ }
+}
+
+async function loadProfiles() {
+  const my = ++Admin.seq.profiles;
+  $('profTable').innerHTML = '<tbody><tr><td style="padding:30px;color:var(--muted)">Loading…</td></tr></tbody>';
+  try {
+    const res = await call('getProfilesAdmin');
+    if (my !== Admin.seq.profiles) return;
+    if (!res.ok) throw new Error(res.error || 'Failed');
+    const data = res.data || [];
+    setProfBadge(res.pendingCount || 0);
+    const done = data.filter(w => w.complete).length;
+    $('profSub').textContent = done + ' of ' + data.length + ' complete';
+
+    const pend = data.filter(w => w.pending);
+    $('pendBox').innerHTML = pend.length ? `<div class="pend-grid">${pend.map(w => `
+      <div class="pend-card">
+        <div class="pc-h">🏦 Bank change request — ${esc(w.name)} (${esc(w.id)})</div>
+        <div class="old">${esc(w.bankName)} · ${esc(w.branch)} · ${esc(w.accountNo)} · ${esc(w.accountName)}</div>
+        <div>➜ <b>${esc(w.pending.bankName)} · ${esc(w.pending.branch)} · ${esc(w.pending.accountNo)} · ${esc(w.pending.accountName)}</b></div>
+        <div class="rq-actions">
+          <button class="rq-approve" data-act="bank" data-id="${esc(w.pending.id)}" data-status="approved">✓ Approve</button>
+          <button class="rq-reject" data-act="bank" data-id="${esc(w.pending.id)}" data-status="rejected">✕ Reject</button>
+        </div>
+      </div>`).join('')}</div>` : '';
+
+    const dash = v => v ? esc(v) : '<span style="color:var(--muted-2)">—</span>';
+    $('profTable').innerHTML = `<thead><tr><th>Emp No.</th><th class="tc-name">Name</th><th>Phone</th><th>ID No.</th><th>Birthday</th><th>Address</th><th>Bank</th><th>Branch</th><th>Account No.</th><th>Account holder</th><th>Status</th></tr></thead><tbody>${
+      data.map(w => `<tr><td class="wno">${esc(w.id)}</td><td class="tc-name">${esc(w.name)}</td><td>${dash(w.phone)}</td><td>${dash(w.nic)}</td><td>${dash(w.dob)}</td><td style="white-space:normal;min-width:180px">${dash(w.address)}</td><td>${dash(w.bankName)}</td><td>${dash(w.branch)}</td><td>${dash(w.accountNo)}</td><td>${dash(w.accountName)}</td><td>${w.complete ? '✅' : '⚠ incomplete'}${w.pending ? ' 🕒' : ''}</td></tr>`).join('')}</tbody>`;
+  } catch (_) {
+    if (my !== Admin.seq.profiles) return;
+    $('profTable').innerHTML = '<tbody><tr><td style="padding:30px;color:var(--muted)">Unable to load worker details</td></tr></tbody>';
+  }
+}
+
+$('pendBox').addEventListener('click', async function (e) {
+  const b = e.target.closest('button[data-act="bank"]');
+  if (!b) return;
+  if (b.dataset.status === 'approved' && !confirm('Approve this bank change? Future salary transfers will go to the NEW account.')) return;
+  b.disabled = true;
+  try {
+    const res = await call('decideBankChange', { id: b.dataset.id, status: b.dataset.status });
+    if (res.ok) { toast(b.dataset.status === 'approved' ? '✅ Bank details updated' : '✕ Request rejected'); loadProfiles(); }
+    else { toast(res.error || 'Failed', true); b.disabled = false; }
+  } catch (_) { toast('Network error', true); b.disabled = false; }
+});
+
+/* ── Notices (memos) ── */
+function memoMode() {
+  const r = document.querySelector('input[name="memoTo"]:checked');
+  return r ? r.value : 'all';
+}
+
+function renderMemoPick() {
+  const box = $('memoPick');
+  const keep = new Set(Array.from(box.querySelectorAll('input[data-id]:checked')).map(i => i.dataset.id));
+  box.innerHTML = '<label class="pick-all"><input type="checkbox" id="memoPickAll"> Select all</label>' +
+    Admin.workers.map(w => `<label><input type="checkbox" data-id="${esc(w.id)}"${keep.has(w.id) ? ' checked' : ''}> ${esc(w.name)}</label>`).join('');
+}
+
+function syncMemoMode() {
+  const sel = memoMode() === 'sel';
+  $('memoPick').classList.toggle('hidden', !sel);
+  if (sel) renderMemoPick();
+}
+
+document.querySelectorAll('input[name="memoTo"]').forEach(r => r.addEventListener('change', syncMemoMode));
+$('memoPick').addEventListener('change', function (e) {
+  if (e.target.id === 'memoPickAll') {
+    $('memoPick').querySelectorAll('input[data-id]').forEach(i => { i.checked = e.target.checked; });
+  }
+});
+$('memoText').addEventListener('input', () => { $('memoCount').textContent = $('memoText').value.length + ' / 500'; });
+
+async function loadMemos() {
+  const my = ++Admin.seq.memos;
+  const list = $('memoList');
+  if (!Admin.workersLoaded) await loadWorkers(true);
+  syncMemoMode();
+  try {
+    const res = await call('getMemosAdmin');
+    if (my !== Admin.seq.memos) return;
+    if (!res.ok) throw new Error(res.error || 'Failed');
+    const data = res.data || [];
+    if (!data.length) { list.innerHTML = '<div class="empty-msg">No notices sent yet</div>'; return; }
+    list.innerHTML = data.map(m => `
+      <div class="memo-item">
+        <button class="mi-del" data-act="delmemo" data-id="${esc(m.id)}" title="Delete (workers will no longer see it)">🗑</button>
+        ${m.title ? `<div class="mi-t">${esc(m.title)}</div>` : ''}
+        <div class="mi-b">${esc(m.message)}</div>
+        <div class="mi-m">${esc(fmtDT(m.ts))} · To: ${m.toAll ? 'All workers' : esc(m.recipients.join(', '))}</div>
+      </div>`).join('');
+  } catch (_) {
+    if (my !== Admin.seq.memos) return;
+    list.innerHTML = '<div class="empty-msg">Unable to load notices</div>';
+  }
+}
+
+$('memoSendBtn').addEventListener('click', async function () {
+  const btn = this;
+  const message = $('memoText').value.trim();
+  const title = $('memoTitle').value.trim();
+  if (!message) { toast('Type a message first', true); return; }
+  let target = 'ALL';
+  if (memoMode() === 'sel') {
+    target = Array.from($('memoPick').querySelectorAll('input[data-id]:checked')).map(i => i.dataset.id);
+    if (!target.length) { toast('Select at least one worker', true); return; }
+  }
+  btn.disabled = true;
+  try {
+    const res = await call('sendMemo', { target: target, title: title, message: message });
+    if (res.ok) {
+      toast('✅ Sent to ' + res.sentTo + ' worker(s)');
+      $('memoText').value = ''; $('memoTitle').value = ''; $('memoCount').textContent = '0 / 500';
+      loadMemos();
+    } else toast(res.error || 'Failed', true);
+  } catch (_) { toast('Network error — not sent', true); }
+  finally { btn.disabled = false; }
+});
+
+$('memoList').addEventListener('click', async function (e) {
+  const b = e.target.closest('button[data-act="delmemo"]');
+  if (!b || !confirm('Delete this notice? Workers will no longer see it.')) return;
+  b.disabled = true;
+  try {
+    const res = await call('deleteMemo', { id: b.dataset.id });
+    if (res.ok) { toast('Deleted'); loadMemos(); } else { toast(res.error || 'Failed', true); b.disabled = false; }
+  } catch (_) { toast('Network error', true); b.disabled = false; }
+});
+
 /* ── Workers (roster) ── */
 async function loadWorkers(quiet) {
   try {
@@ -566,6 +892,7 @@ function initAdmin() {
   initSelectors();
   loadPayroll();
   refreshPendingBadge();
+  refreshProfBadge();
   loadWorkers(true);      // fills the Photo Proof worker filter right away
 }
 

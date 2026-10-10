@@ -180,6 +180,49 @@ td.tc-in { color: var(--green-glow); } td.tc-miss { color: var(--muted-2); }
 
 .pin-reset-btn { background: var(--amber-bg); color: var(--amber-2); border: 1px solid var(--amber); border-radius: 7px; padding: 5px 10px; cursor: pointer; font-size: 12px; font-weight: 600; transition: background .2s; white-space: nowrap; }
 .pin-reset-btn:hover { background: var(--amber); color: #000; }
+
+/* ── Notices ── */
+.memo-form { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; max-width: 760px; }
+.mf-row { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13.5px; font-weight: 600; }
+.mf-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.memo-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; max-height: 220px; overflow-y: auto; font-size: 13px; }
+.memo-pick label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.memo-pick .pick-all { grid-column: 1 / -1; padding-bottom: 6px; border-bottom: 1px solid var(--line-soft); color: var(--green-glow); font-weight: 700; }
+.memo-in { width: 100%; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; padding: 11px 13px; font: inherit; font-size: 14px; outline: none; }
+.memo-in:focus { border-color: var(--green-br); }
+textarea.memo-in { resize: vertical; min-height: 100px; }
+.mf-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.memo-list { padding: 14px 20px 20px; display: grid; gap: 10px; }
+.memo-item { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; position: relative; }
+.memo-item .mi-t { font-weight: 700; font-size: 14px; margin-bottom: 3px; }
+.memo-item .mi-b { font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.memo-item .mi-m { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+.memo-item .mi-del { position: absolute; top: 10px; right: 10px; background: transparent; border: 1px solid var(--line); color: var(--red); border-radius: 8px; padding: 3px 9px; cursor: pointer; font-size: 12px; }
+
+/* ── Payslip / transfer modal ── */
+.modal-ov { position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; width: 100%; max-width: 760px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line-soft); }
+.modal-head h3 { font-size: 16px; font-weight: 700; }
+.modal-x { background: transparent; border: none; color: var(--muted); font-size: 24px; cursor: pointer; line-height: 1; }
+.modal-body { padding: 16px 18px; overflow-y: auto; font-size: 13.5px; }
+.modal-foot { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 18px; border-top: 1px solid var(--line-soft); }
+.mrow { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line-soft); }
+.mrow span:first-child { color: var(--muted); }
+.mrow.big { font-size: 17px; font-weight: 800; color: var(--green-glow); border-bottom: none; }
+.mwarn { background: var(--amber-bg); color: var(--amber); border-radius: 10px; padding: 9px 12px; margin: 10px 0; font-size: 12.5px; line-height: 1.5; }
+.mnote { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 10px; }
+.mini-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+.mini-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.mini-table td { padding: 6px 8px; border-bottom: 1px solid var(--line-soft); }
+.mini-table .r { text-align: right; }
+.slip-btn { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 4px 9px; cursor: pointer; font-size: 12px; }
+.slip-btn:hover { background: var(--line-soft); }
+.pend-grid { padding: 14px 20px 4px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.pend-card { background: var(--amber-bg); border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; font-size: 13px; line-height: 1.55; }
+.pend-card .pc-h { font-weight: 700; margin-bottom: 4px; }
+.pend-card .old { color: var(--muted); text-decoration: line-through; }
+.pend-card .rq-actions { margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -219,6 +262,8 @@ td.tc-in { color: var(--green-glow); } td.tc-miss { color: var(--muted-2); }
     <button class="tab" data-tab="attendance">📋 Attendance</button>
     <button class="tab" data-tab="requests">📨 Requests <span class="cnt zero" id="reqCnt">0</span></button>
     <button class="tab" data-tab="proof">📸 Photo Proof</button>
+    <button class="tab" data-tab="memos">📣 Notices</button>
+    <button class="tab" data-tab="profiles">👤 Worker Details <span class="cnt zero" id="profCnt">0</span></button>
     <button class="tab" data-tab="settings">⚙ Workers</button>
   </div>
 
@@ -232,6 +277,10 @@ td.tc-in { color: var(--green-glow); } td.tc-miss { color: var(--muted-2); }
       <div class="panel-head" style="border-top:1px solid var(--line-soft)">
         <h2 id="payTitle">Payroll</h2>
         <span class="sub" id="paySub"></span>
+        <span class="sub" id="payDue" style="font-weight:700"></span>
+        <span class="spacer"></span>
+        <button class="btn btn-ghost" id="allSlipsBtn">📄 All Payslips (PDF)</button>
+        <button class="btn btn-green" id="transferBtn">🏦 Bank Transfer</button>
       </div>
       <div class="table-wrap"><table id="payTable"></table></div>
     </section>
@@ -273,6 +322,41 @@ td.tc-in { color: var(--green-glow); } td.tc-miss { color: var(--muted-2); }
       </div>
     </section>
 
+    <!-- WORKER DETAILS -->
+    <section id="t-profiles" class="panel hidden">
+      <div class="panel-head">
+        <h2>👤 Worker Details</h2>
+        <span class="sub" id="profSub"></span>
+        <span class="spacer"></span>
+        <span class="sub">Filled in by workers in their app · bank details lock after the first save</span>
+      </div>
+      <div id="pendBox"></div>
+      <div class="table-wrap"><table id="profTable"></table></div>
+    </section>
+
+    <!-- NOTICES -->
+    <section id="t-memos" class="panel hidden">
+      <div class="panel-head">
+        <h2>📣 Send Notice to Workers</h2>
+        <span class="sub">Workers read it in their app after entering their PIN</span>
+      </div>
+      <div class="memo-form">
+        <div class="mf-row">
+          <label><input type="radio" name="memoTo" value="all" checked> All workers</label>
+          <label><input type="radio" name="memoTo" value="sel"> Selected workers</label>
+        </div>
+        <div class="memo-pick hidden" id="memoPick"></div>
+        <input class="memo-in" id="memoTitle" maxlength="60" placeholder="Title (optional)">
+        <textarea class="memo-in" id="memoText" maxlength="500" rows="4" placeholder="Type your message…"></textarea>
+        <div class="mf-foot">
+          <span class="sub" id="memoCount">0 / 500</span>
+          <button class="btn btn-green" id="memoSendBtn">📣 Send</button>
+        </div>
+      </div>
+      <div class="panel-head" style="border-top:1px solid var(--line-soft)"><h2>Sent notices</h2></div>
+      <div class="memo-list" id="memoList"><div class="empty-msg">Loading…</div></div>
+    </section>
+
     <!-- SETTINGS -->
     <section id="t-settings" class="panel hidden">
       <div class="panel-head">
@@ -303,6 +387,15 @@ td.tc-in { color: var(--green-glow); } td.tc-miss { color: var(--muted-2); }
 </div><!-- /adminApp -->
 
 <!-- Lightbox -->
+<!-- PAYSLIP / TRANSFER MODAL -->
+<div class="modal-ov hidden" id="docModal" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="docTitle"></h3><button class="modal-x" id="docClose" aria-label="Close">×</button></div>
+    <div class="modal-body" id="docBody"></div>
+    <div class="modal-foot" id="docFoot"></div>
+  </div>
+</div>
+
 <div class="lightbox hidden" id="lightbox" role="dialog" aria-modal="true">
   <button class="lb-close" id="lbClose" aria-label="Close">×</button>
   <img id="lbImg" alt="Attendance photo">
@@ -314,6 +407,8 @@ td.tc-in { color: var(--green-glow); } td.tc-miss { color: var(--muted-2); }
 <!-- ✅ Script load order: config → logo → admin -->
 <script src="../shared/config.js"></script>
 <script src="../shared/logo.js"></script>
+<script src="../shared/jspdf.umd.min.js"></script>
+<script src="./pdf.js"></script>
 <script src="./admin.js"></script>
 </body>
 </html>

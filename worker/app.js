@@ -23,6 +23,8 @@ const App = {
   capturedBlob: null,
   coords: null,
   online: navigator.onLine,
+  sessionPin: '',          // kept in memory only, while My Details is open
+  profile: null,
   offlineQueue: [],
 };
 
@@ -226,6 +228,9 @@ function resetSelfie() {
 $('workerSel').addEventListener('change', function () {
   App.worker = App.workers.find(w => w.id === this.value) || null;
   resetSelfie();                       // never reuse another worker's photo
+  resetPayBox();                       // never show another worker's salary
+  closeProfSheet();                    // …or another worker's personal details
+  $('msgSheet').classList.add('hidden');
   $('workerSection').classList.toggle('hidden', !App.worker);
   if (App.worker) checkStatus();
 });
@@ -307,7 +312,7 @@ function stopCamera() {
     App.stream = null;
   }
 }
-window.addEventListener('pagehide', stopCamera);
+window.addEventListener('pagehide', () => { stopCamera(); App.sessionPin = ''; });
 
 function capturePhoto() {
   const video = $('wVideo'), preview = $('wPreview');
@@ -418,6 +423,9 @@ async function submitPin() {
       try { res = await apiPost(payload); } catch (_) { netFail = true; }
     }
 
+    if (netFail && (job.kind === 'pay' || job.kind === 'inbox' || job.kind === 'profile')) {   // read-only views need internet
+      closePinModal(); toast('Internet connection needed', true); return;
+    }
     if (netFail) {                                              // offline / server unreachable
       if (!apiConfigured()) { closePinModal(); toast('Backend URL not set in shared/config.js', true); return; }
       if (!localPinOk(worker.id, pin)) { pinFail('Wrong PIN'); return; }
@@ -427,7 +435,7 @@ async function submitPin() {
     }
     if (res && res.ok) {
       lsSet('sphome_pin_' + worker.id, pin);
-      finishAction(job.kind, payload, false);
+      finishAction(job.kind, payload, false, res);
     } else if (res && res.code === 'PIN') {
       pinFail(res.error || 'Wrong PIN — try again');
     } else {
@@ -442,9 +450,12 @@ async function submitPin() {
   }
 }
 
-function finishAction(kind, payload, queued) {
+function finishAction(kind, payload, queued, res) {
   closePinModal();
   const sfx = queued ? ' (offline)' : '';
+  if (kind === 'pay') { renderPay(res); return; }
+  if (kind === 'inbox') { renderMemos(res); return; }
+  if (kind === 'profile') { App.sessionPin = payload.pin; renderProfile(res); return; }
   if (kind === 'clockIn' || kind === 'clockOut') {
     const isIn = kind === 'clockIn';
     setLocalStatus(payload.workerId, isIn, payload.timestamp);
@@ -491,6 +502,191 @@ document.querySelectorAll('.pin-key').forEach(btn => {
   btn.addEventListener('click', function () { if (this.dataset.key) pinKey(this.dataset.key); });
 });
 $('pinCancel').addEventListener('click', closePinModal);
+
+/* ── My salary balance + office notices (both PIN protected) ── */
+function money(v) { return (CONFIG.CURRENCY || 'Rs.') + ' ' + Math.round(Number(v) || 0).toLocaleString(); }
+
+function resetPayBox() {
+  const box = $('payBox');
+  if (box) box.innerHTML = '<div class="pay-hint">Tap the button and enter your PIN to see your salary balance so far.</div>';
+  const btn = $('btnShowPay');
+  if (btn) btn.textContent = '👁 Show My Salary';
+}
+
+function renderPay(res) {
+  const box = $('payBox');
+  const p = res && res.pay;
+  if (!p) { box.innerHTML = '<div class="pay-hint">Could not load salary</div>'; return; }
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const asOf = res.asOf ? new Date(res.asOf) : new Date();
+  const bonusLine = p.bonus > 0
+    ? `<div class="pay-row"><span>Attendance bonus</span><span class="num">${money(p.bonus)}</span></div>`
+    : `<div class="pay-row"><span>Attendance bonus</span><span class="num">${money(0)}</span></div>`;
+  box.innerHTML = `
+    <div class="pay-big">
+      <div class="k">Balance so far · ${esc(months[(res.month || 1) - 1])} ${esc(res.year)}</div>
+      <div class="v num">${money(p.net)}</div>
+    </div>
+    <div class="pay-row"><span>Full working days</span><span class="num">${esc(p.days)}</span></div>
+    <div class="pay-row"><span>Day pay</span><span class="num">${money(p.basicPay)}</span></div>
+    <div class="pay-row"><span>OT (${esc(p.otHours)} hrs)</span><span class="num">${money(p.otPay)}</span></div>
+    <div class="pay-row"><span>Short-day pay</span><span class="num">${money(p.shortPay)}</span></div>
+    ${bonusLine}
+    <div class="pay-row"><span>Total earned</span><span class="num">${money(p.gross)}</span></div>
+    <div class="pay-row neg"><span>Advances taken</span><span class="num">− ${money(p.advance)}</span></div>
+    <div class="pay-note">Bonus: ${money(res.bonusPerDay)} per full day, only when you complete ${esc(res.bonusMinDays)} or more full days.
+      Updated ${esc(asOf.toLocaleString())}. Final amount is confirmed by the office at month end.</div>
+    ${p.incomplete ? `<div class="pay-warn">⚠ ${esc(p.incomplete)} shift(s) have no clock-out and are not counted yet. Tell the office.</div>` : ''}`;
+  $('btnShowPay').textContent = '↻ Refresh';
+}
+
+function renderMemos(res) {
+  const box = $('msgContent');
+  const list = (res && Array.isArray(res.data)) ? res.data : [];
+  box.innerHTML = list.length ? list.map(m => {
+    const d = m.ts ? new Date(m.ts) : null;
+    return `<div class="memo">
+      ${m.title ? `<div class="mt">${esc(m.title)}</div>` : ''}
+      <div class="mb">${esc(m.message)}</div>
+      <div class="md">${d && !isNaN(d.getTime()) ? esc(d.toLocaleString()) : ''}</div>
+    </div>`;
+  }).join('') : '<div class="empty-msg">No notices</div>';
+  $('msgSheet').classList.remove('hidden');
+}
+
+$('btnShowPay').addEventListener('click', () => {
+  if (!App.online) { toast('Internet connection needed', true); return; }
+  openPin('pay', async () => ({ action: 'getMyPay', workerId: App.worker.id }));
+});
+$('btnMessages').addEventListener('click', () => {
+  if (!App.online) { toast('Internet connection needed', true); return; }
+  openPin('inbox', async () => ({ action: 'getMyMemos', workerId: App.worker.id }));
+});
+$('closeMsgSheet').addEventListener('click', () => $('msgSheet').classList.add('hidden'));
+
+/* ── My details (phone, ID, birthday, address, bank) ── */
+function showEl(id, on) { const e = $(id); if (e) e.classList.toggle('hidden', !on); }
+
+function closeProfSheet() {
+  App.sessionPin = '';
+  App.profile = null;
+  const sh = $('profSheet');
+  if (sh) sh.classList.add('hidden');
+  ['pfPhone', 'pfNic', 'pfDob', 'pfAddress', 'pfBankName', 'pfBranch', 'pfAccNo', 'pfAccName'].forEach(id => { if ($(id)) $(id).value = ''; });
+  if ($('pfErr')) $('pfErr').textContent = '';
+}
+
+// state: { profile, pending, changeMode }
+function renderProfile(res) {
+  const pr = res && res.profile;
+  if (!pr) { toast('Could not load your details', true); return; }
+  const pending = res.pending || null;
+  App.profile = { profile: pr, pending: pending, changeMode: false };
+  $('pfErr').textContent = '';
+  $('pfPhone').value = pr.phone || '';
+  $('pfNic').value = pr.nic || '';
+  $('pfDob').value = pr.dob || '';
+  $('pfAddress').value = pr.address || '';
+  ['pfBankName', 'pfBranch', 'pfAccNo', 'pfAccName'].forEach(id => { $(id).value = ''; });
+
+  if (pr.bankLocked) {
+    $('bankLockedRows').innerHTML = [['Bank', pr.bankName], ['Branch', pr.branch], ['Account', pr.accountNo], ['Holder', pr.accountName]]
+      .map(r => `<div class="pay-row"><span>${esc(r[0])}</span><span class="num">${esc(r[1])}</span></div>`).join('');
+    showEl('bankLockedBox', !pending);
+    showEl('bankForm', false);
+    if (pending) {
+      $('bankPendingBox').innerHTML = '🕒 Bank change waiting for office approval:<br><b>' +
+        esc(pending.bankName) + ' · ' + esc(pending.branch) + ' · ' + esc(pending.accountNo) + ' · ' + esc(pending.accountName) + '</b><br>Your current account stays active until it is approved.';
+    }
+    showEl('bankPendingBox', !!pending);
+  } else {
+    showEl('bankLockedBox', false);
+    showEl('bankPendingBox', false);
+    showEl('bankForm', true);
+    showEl('bankFirstWarn', true);
+    showEl('btnSendBankChange', false);
+  }
+  $('profSheet').classList.remove('hidden');
+}
+
+function readBankInputs() {
+  return {
+    bankName: $('pfBankName').value.trim(), branch: $('pfBranch').value.trim(),
+    accountNo: $('pfAccNo').value.replace(/[\s-]/g, ''), accountName: $('pfAccName').value.trim(),
+  };
+}
+function bankInputsError(b) {
+  if (!b.bankName || !b.branch || !b.accountNo || !b.accountName) return 'Fill in all four bank fields';
+  if (!/^\d{6,20}$/.test(b.accountNo)) return 'Account number must be 6-20 digits';
+  return '';
+}
+
+$('btnProfile').addEventListener('click', () => {
+  if (!App.online) { toast('Internet connection needed', true); return; }
+  openPin('profile', async () => ({ action: 'getMyProfile', workerId: App.worker.id }));
+});
+$('closeProfSheet').addEventListener('click', closeProfSheet);
+
+$('btnBankChange').addEventListener('click', () => {
+  if (!App.profile) return;
+  App.profile.changeMode = true;
+  showEl('bankLockedBox', false);
+  showEl('bankForm', true);
+  showEl('bankFirstWarn', false);
+  showEl('btnSendBankChange', true);
+  $('pfErr').textContent = '';
+  $('pfBankName').focus();
+});
+
+async function profileCall(btn, payload, onOk) {
+  const err = $('pfErr');
+  if (!App.worker || !App.sessionPin) { err.textContent = 'Session ended — close and open My Details again'; return; }
+  if (!App.online) { err.textContent = 'Internet connection needed'; return; }
+  btn.disabled = true;
+  err.textContent = '';
+  try {
+    const res = await apiPost(Object.assign({ workerId: App.worker.id, pin: App.sessionPin }, payload));
+    if (res && res.ok) onOk(res);
+    else if (res && res.code === 'PIN') err.textContent = res.error || 'PIN problem — close and open again';
+    else err.textContent = (res && res.error) || 'Could not save';
+  } catch (_) {
+    err.textContent = 'Network error — try again';
+  } finally { btn.disabled = false; }
+}
+
+$('btnSaveProfile').addEventListener('click', function () {
+  if (!App.profile) return;
+  const p = App.profile.profile;
+  const payload = {
+    action: 'saveMyProfile', phone: $('pfPhone').value.trim(), nic: $('pfNic').value.trim(),
+    dob: $('pfDob').value, address: $('pfAddress').value.trim(),
+  };
+  if (!p.bankLocked) {
+    const b = readBankInputs();
+    const any = b.bankName || b.branch || b.accountNo || b.accountName;
+    if (any) {
+      const e = bankInputsError(b);
+      if (e) { $('pfErr').textContent = e; return; }
+      if (!confirm('Save these bank details?\n\n' + b.bankName + ' · ' + b.branch + '\n' + b.accountNo + '\n' + b.accountName +
+        '\n\nAfter saving you cannot change them without office approval.')) return;
+      Object.assign(payload, b);
+    }
+  }
+  profileCall(this, payload, res => {
+    toast(res.bankSaved ? '✅ Saved. Bank details are now locked' : '✅ Details saved');
+    renderProfile(res);
+  });
+});
+
+$('btnSendBankChange').addEventListener('click', function () {
+  const b = readBankInputs();
+  const e = bankInputsError(b);
+  if (e) { $('pfErr').textContent = e; return; }
+  profileCall(this, Object.assign({ action: 'requestBankChange' }, b), res => {
+    toast('✅ Request sent to the office');
+    renderProfile({ profile: App.profile.profile, pending: res.pending });
+  });
+});
 
 /* ── Change PIN ── */
 $('btnChangePin').addEventListener('click', function () {

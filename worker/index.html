@@ -238,6 +238,27 @@ textarea.input { resize: vertical; min-height: 64px; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.err { border-color: #5a2820; box-shadow: var(--shadow); }
 
+
+/* ── Salary + messages ── */
+.pay-hint { font-size: 12.5px; color: var(--muted); line-height: 1.5; padding: 2px 0 12px; }
+.pay-big { text-align: center; padding: 14px 8px 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.pay-big .k { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .6px; text-transform: uppercase; }
+.pay-big .v { font-size: 30px; font-weight: 800; color: var(--green-glow); margin-top: 4px; }
+.pay-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+.pay-row span:first-child { color: var(--muted); }
+.pay-row.neg span:last-child { color: var(--red); }
+.pay-note { font-size: 11.5px; color: var(--muted); margin: 10px 0 12px; line-height: 1.5; }
+.pay-warn { font-size: 12px; color: var(--amber); background: var(--amber-bg); border-radius: 10px; padding: 8px 10px; margin: 10px 0 0; }
+.memo { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 13px; margin-bottom: 10px; }
+.memo .mt { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.memo .mb { font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.memo .md { font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+/* ── My details ── */
+#profSheet .sheet-card { max-height: 92vh; overflow-y: auto; }
+.pf-sec { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--green-glow); margin: 18px 0 10px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.pf-locked { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 6px 13px; margin-bottom: 10px; }
+.pf-err { color: var(--red); font-size: 13px; min-height: 18px; margin: 4px 0 10px; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -310,6 +331,26 @@ textarea.input { resize: vertical; min-height: 64px; }
       <button class="btn btn-ghost btn-sm" id="btnLeave">🌿 Leave</button>
       <button class="btn btn-ghost btn-sm" id="btnChangePin">🔒 PIN</button>
     </div>
+  </div>
+
+  <!-- My salary balance (PIN protected) -->
+  <div class="card">
+    <div class="card-lbl">💵 My Salary — This Month</div>
+    <div id="payBox"><div class="pay-hint">Tap the button and enter your PIN to see your salary balance so far.</div></div>
+    <button class="btn btn-green btn-block" id="btnShowPay">👁 Show My Salary</button>
+  </div>
+
+  <!-- Messages from the office (PIN protected) -->
+  <div class="card">
+    <div class="card-lbl">📨 Notices from Office</div>
+    <button class="btn btn-ghost btn-block" id="btnMessages">📨 Open Notices</button>
+  </div>
+
+  <!-- My details: phone, ID, birthday, address, bank (PIN protected) -->
+  <div class="card">
+    <div class="card-lbl">👤 My Details</div>
+    <div class="pay-hint">Phone, ID number, birthday, address and bank account for salary.</div>
+    <button class="btn btn-ghost btn-block" id="btnProfile">👤 Open My Details</button>
   </div>
 
   <!-- Advance request -->
@@ -427,6 +468,63 @@ textarea.input { resize: vertical; min-height: 64px; }
     <div id="recordsContent">
       <div class="empty-msg">Loading…</div>
     </div>
+  </div>
+</div>
+
+<!-- MY DETAILS SHEET -->
+<div class="sheet hidden" id="profSheet" role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <h3>👤 My Details</h3>
+      <button class="sheet-x" id="closeProfSheet" aria-label="Close">×</button>
+    </div>
+    <div class="field"><label for="pfPhone">Phone number (WhatsApp)</label>
+      <input class="input" type="tel" id="pfPhone" inputmode="tel" maxlength="16" placeholder="0771234567" autocomplete="off"></div>
+    <div class="field"><label for="pfNic">ID number (NIC)</label>
+      <input class="input" type="text" id="pfNic" maxlength="12" placeholder="199012345678 or 901234567V" autocomplete="off"></div>
+    <div class="field"><label for="pfDob">Birthday</label>
+      <input class="input" type="date" id="pfDob"></div>
+    <div class="field"><label for="pfAddress">Permanent address</label>
+      <textarea class="input" id="pfAddress" maxlength="200" placeholder="House no., street, town"></textarea></div>
+
+    <div class="pf-sec">🏦 Bank account for salary</div>
+    <div id="bankLockedBox" class="hidden">
+      <div class="pf-locked" id="bankLockedRows"></div>
+      <div class="pay-note">🔒 Bank details are locked. To change them, send a request — the office must approve it.</div>
+      <button class="btn btn-ghost btn-block" id="btnBankChange">Request bank change</button>
+    </div>
+    <div id="bankPendingBox" class="pay-warn hidden"></div>
+    <div id="bankForm">
+      <div class="pay-warn" id="bankFirstWarn">⚠ Check carefully. After you save, you cannot change the bank details yourself — only the office can approve a change.</div>
+      <div class="field"><label for="pfBankName">Bank</label>
+        <input class="input" type="text" id="pfBankName" list="bankList" maxlength="40" placeholder="e.g. Sampath Bank" autocomplete="off">
+        <datalist id="bankList">
+          <option value="Sampath Bank"><option value="Bank of Ceylon"><option value="People's Bank"><option value="Commercial Bank">
+          <option value="Hatton National Bank"><option value="National Savings Bank"><option value="Seylan Bank"><option value="Nations Trust Bank">
+          <option value="DFCC Bank"><option value="NDB Bank"><option value="Pan Asia Bank"><option value="Union Bank"><option value="Amana Bank">
+          <option value="Cargills Bank"><option value="Regional Development Bank"><option value="Sanasa Development Bank">
+        </datalist></div>
+      <div class="field"><label for="pfBranch">Branch</label>
+        <input class="input" type="text" id="pfBranch" maxlength="40" placeholder="e.g. Narammala" autocomplete="off"></div>
+      <div class="field"><label for="pfAccNo">Account number</label>
+        <input class="input num-in" type="text" id="pfAccNo" inputmode="numeric" maxlength="24" placeholder="digits only" autocomplete="off"></div>
+      <div class="field"><label for="pfAccName">Account holder name (as in the bank, English)</label>
+        <input class="input" type="text" id="pfAccName" maxlength="60" placeholder="e.g. Nimal Perera" autocomplete="off"></div>
+      <button class="btn btn-ghost btn-block hidden" id="btnSendBankChange">📨 Send change request to office</button>
+    </div>
+    <div class="pf-err" id="pfErr" role="alert"></div>
+    <button class="btn btn-green btn-block" id="btnSaveProfile">💾 Save</button>
+  </div>
+</div>
+
+<!-- MESSAGES SHEET -->
+<div class="sheet hidden" id="msgSheet" role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <h3>📨 Notices</h3>
+      <button class="sheet-x" id="closeMsgSheet" aria-label="Close">×</button>
+    </div>
+    <div id="msgContent"><div class="empty-msg">No notices</div></div>
   </div>
 </div>
 
