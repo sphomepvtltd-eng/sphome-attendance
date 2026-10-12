@@ -107,9 +107,10 @@
     d.setFillColor(45, 102, 34); d.rect(0, 0, PW, 26, 'F');
     d.setTextColor(255); d.setFont('helvetica', 'bold'); d.setFontSize(16); d.text(T(data.company), M, 12);
     d.setFontSize(10); d.setFont('helvetica', 'normal');
-    d.text('Salary period: ' + fmtDate(data.periodStart) + ' - ' + fmtDate(data.periodEnd), M, 19.5);
+    if (data.companyAddress) { d.setFontSize(8.5); d.text(T(data.companyAddress), M, 16.2); d.setFontSize(10); }
+    d.text('Salary period: ' + fmtDate(data.periodStart) + ' - ' + fmtDate(data.periodEnd), M, 22);
     d.setFont('helvetica', 'bold'); d.setFontSize(15); d.text('PAYSLIP', PW - M, 12, { align: 'right' });
-    d.setFont('helvetica', 'normal'); d.setFontSize(10); d.text(monthName(data.month) + ' ' + data.year, PW - M, 19.5, { align: 'right' });
+    d.setFont('helvetica', 'normal'); d.setFontSize(10); d.text(monthName(data.month) + ' ' + data.year, PW - M, 22, { align: 'right' });
     d.setTextColor(0);
 
     S.y = 35;
@@ -120,15 +121,20 @@
 
     h2(S, 'Earnings and deductions');
     const bonusTxt = sh.bonus > 0 ? 'Earned (' + sh.days + ' full days)' : 'Needs ' + data.bonusMinDays + '+ full days';
-    table(S, [{ h: 'Description', w: 62 }, { h: 'Details', w: 80 }, { h: 'Amount', w: 40, a: 'r' }], [
-      ['Day pay', sh.days + ' full day(s) x ' + money(sh.dailySalary), money(sh.basicPay)],
-      ['Overtime (OT)', num(sh.otHours) + ' hour(s)', money(sh.otPay)],
-      ['Short-day pay', 'Hours worked on part days', money(sh.shortPay)],
-      ['Attendance bonus', bonusTxt, money(sh.bonus)],
+    const earn = sh.payType === 'fixed'
+      ? [['Fixed monthly salary', 'Agreed monthly amount', money(sh.basicPay)]]
+      : [
+        ['Day pay', sh.days + ' full day(s) x ' + money(sh.dailySalary), money(sh.basicPay)],
+        ['Overtime (OT)', num(sh.otHours) + ' hour(s)', money(sh.otPay)],
+        ['Short-day pay', 'Hours worked on part days', money(sh.shortPay)],
+        ['Attendance bonus', bonusTxt, money(sh.bonus)],
+      ];
+    (sh.allowances || []).forEach(a => earn.push(['Special allowance', (a.note || 'Allowance') + ' (' + fmtDate(a.date) + ')', money(a.amount)]));
+    table(S, [{ h: 'Description', w: 62 }, { h: 'Details', w: 80 }, { h: 'Amount', w: 40, a: 'r' }], earn.concat([
       { cells: ['Gross earnings', '', money(sh.gross)], bold: true, fill: [238, 244, 235] },
       ['Less: advances', 'Approved advances this month', '- ' + money(sh.advance)],
       { cells: ['NET PAY', 'Transfer to bank account', money(sh.net)], bold: true, fill: [208, 230, 200] },
-    ]);
+    ]));
 
     const full = sh.detail.filter(x => x.kind === 'full').length;
     const shortN = sh.detail.filter(x => x.kind === 'short').length;
@@ -178,15 +184,16 @@
     return [
       'Payslip - ' + monthName(data.month) + ' ' + data.year + ' (' + sh.name + ')',
       'Days present: ' + sh.presentDays + ' (full ' + sh.days + ')',
-      'Day pay: ' + money(sh.basicPay),
-      'OT ' + num(sh.otHours) + ' hrs: ' + money(sh.otPay),
-      'Short-day pay: ' + money(sh.shortPay),
-      'Bonus: ' + money(sh.bonus),
+      sh.payType === 'fixed' ? 'Fixed salary: ' + money(sh.basicPay) : 'Day pay: ' + money(sh.basicPay),
+      sh.payType === 'fixed' ? '' : 'OT ' + num(sh.otHours) + ' hrs: ' + money(sh.otPay),
+      sh.payType === 'fixed' ? '' : 'Short-day pay: ' + money(sh.shortPay),
+      sh.payType === 'fixed' ? '' : 'Bonus: ' + money(sh.bonus),
+      num(sh.allowance) > 0 ? 'Special allowance: ' + money(sh.allowance) : '',
       'Gross: ' + money(sh.gross),
       'Advances: - ' + money(sh.advance),
       'NET PAY: ' + money(sh.net),
       'Pay date: by ' + fmtDate(data.payDue),
-    ].join('\n');
+    ].filter(Boolean).join('\n');
   }
 
   /* ── bank transfer letter + CSV ── */
@@ -196,7 +203,7 @@
     const doc = newDoc(), S = { doc: doc, y: M };
     const c = data.company;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(35, 85, 28); doc.text(T(c.name), M, S.y + 4);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90); doc.text('Narammala, Sri Lanka', M, S.y + 10);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90); doc.text(T(c.address || ''), M, S.y + 10);
     doc.setTextColor(0); doc.setFontSize(10); doc.text(fmtDate(today), PW - M, S.y + 4, { align: 'right' });
     S.y += 20;
 

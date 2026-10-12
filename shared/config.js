@@ -9,36 +9,21 @@ const CONFIG = {
   // ✅ Paste your Apps Script Web App URL here (must start with https://script.google.com/ and end with /exec)
   BACKEND_URL: 'https://script.google.com/macros/s/AKfycbxqOrpnkUemnIFXKKNDBvogIWN8OASlOl2NKYAHC8eYuQjcCrgl8SQqJGTmJf4_J25q/exec',
 
-  // Worker default PIN — every worker starts with this (can change later)
+  // Company name shown in the apps
+  COMPANY_NAME: 'SP Home Interior',
+
+  // Company location (printed on payslips; the bank-letter address comes from Code.gs)
+  COMPANY_ADDRESS: 'Narammala, Sri Lanka',
+
+  // Prefix for the data this app keeps on each phone — different for every client
+  STORE_PREFIX: 'sphome',
+
+  // Shown to the MD on the PIN-reset button (must equal DEFAULT_WORKER_PIN in Code.gs)
   DEFAULT_WORKER_PIN: '0000',
 
-  // Company name shown in UI
-  COMPANY_NAME: 'SP Home Interior',
+  // Worker app logs out after this many idle minutes (the server enforces its own SESSION_MINUTES too)
+  IDLE_MINUTES: 10,
 
   // Currency
   CURRENCY: 'Rs.',
-
-  // ── Offline fallback roster (names only — real roster & salaries live in the Sheet) ──
-  DEFAULT_WORKERS: [
-    { id: 'EMP001', name: 'Nimal Perera' },
-    { id: 'EMP002', name: 'Kamal Silva' },
-    { id: 'EMP003', name: 'Sunil Fernando' },
-    { id: 'EMP004', name: 'Ruwan Jayasinghe' },
-    { id: 'EMP005', name: 'Chamara Bandara' },
-    { id: 'EMP006', name: 'Lasith Dissanayake' },
-    { id: 'EMP007', name: 'Pradeep Kumara' },
-    { id: 'EMP008', name: 'Asanka Rajapaksha' },
-    { id: 'EMP009', name: 'Thilina Herath' },
-    { id: 'EMP010', name: 'Mahesh Wickrama' },
-    { id: 'EMP011', name: 'Sanjeewa Gunawardena' },
-    { id: 'EMP012', name: 'Dilshan Pathirana' },
-    { id: 'EMP013', name: 'Nuwan Senanayake' },
-    { id: 'EMP014', name: 'Janaka Liyanage' },
-    { id: 'EMP015', name: 'Buddhika Madushanka' },
-    { id: 'EMP016', name: 'Hasitha Wijeratne' },
-    { id: 'EMP017', name: 'Sajith Premaratne' },
-    { id: 'EMP018', name: 'Amila Gunasekara' },
-    { id: 'EMP019', name: 'Chathura Madushanka' },
-    { id: 'EMP020', name: 'Gayan Sampath' },
-  ],
 };

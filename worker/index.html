@@ -18,7 +18,8 @@
 <link rel="icon" type="image/png" sizes="512x512" href="../shared/icon-512.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"></noscript>
 
 <style>
 
@@ -259,6 +260,33 @@ textarea.input { resize: vertical; min-height: 64px; }
 .pf-sec { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--green-glow); margin: 18px 0 10px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
 .pf-locked { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 6px 13px; margin-bottom: 10px; }
 .pf-err { color: var(--red); font-size: 13px; min-height: 18px; margin: 4px 0 10px; line-height: 1.4; }
+
+/* ── v4: login, session bar, team mode ── */
+.login-card .lg-hint { font-size: 12px; color: var(--muted); margin: 2px 0 12px; line-height: 1.5; }
+.login-card .pin-dots { margin: 16px 0 8px; }
+.login-card .keypad { max-width: 300px; margin: 0 auto; }
+.sess-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 14px; border-radius: 14px;
+  background: var(--surface-2); border: 1px solid var(--line); }
+.sess-bar .who-n { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-bar .who-n small { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
+.idle-warn { position: sticky; top: 70px; z-index: 35; margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; font-size: 13px; font-weight: 700;
+  background: var(--amber-bg); color: var(--amber); border: 1px solid #4a3a10; text-align: center; cursor: pointer; }
+.cam-msg { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 18px; color: var(--muted); font-size: 13px; z-index: 3; }
+.cam-row { grid-template-columns: 1fr 1fr 1fr; }
+.btn-capture { padding: 15px; font-size: 16px; }
+.adv-info { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 0 0 12px; padding: 9px 11px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line-soft); }
+.adv-info b { color: var(--green-glow); }
+.team-row { display: flex; align-items: center; gap: 10px; padding: 11px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 13px; margin-bottom: 8px; }
+.team-row .tn { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 700; }
+.team-row .tn small { display: block; color: var(--muted); font-size: 11px; font-weight: 600; margin-top: 2px; }
+.team-row .tn small.on { color: var(--green-glow); }
+.team-row .btn { padding: 10px 14px; font-size: 13px; }
+#teamSheet .selfie-zone { margin-bottom: 12px; }
+.pf-hint { font-size: 12px; color: var(--muted); margin: 6px 0 12px; line-height: 1.5; }
+.busy { position: fixed; inset: 0; z-index: 250; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+.busy .bx { background: var(--surface); border: 1px solid var(--green-dim); border-radius: 18px; padding: 22px 28px; font-weight: 700; font-size: 14px; text-align: center; }
+.busy .spin { width: 28px; height: 28px; margin: 0 auto 12px; border: 3px solid var(--line); border-top-color: var(--green-glow); border-radius: 50%; animation: rot .8s linear infinite; }
+@keyframes rot { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -280,105 +308,20 @@ textarea.input { resize: vertical; min-height: 64px; }
   <div class="clock-date" id="clockDate">—</div>
 </div>
 
-<!-- Worker select -->
-<div class="card">
-  <div class="card-lbl">Select your name</div>
-  <select class="wsel" id="workerSel" aria-label="Select Worker">
-    <option value="">— Select Worker —</option>
-  </select>
-</div>
-
-<!-- Worker section -->
-<section id="workerSection" class="hidden">
-
-  <!-- Status -->
-  <div class="status-banner" id="statusBanner">
-    <span class="sdot"></span>
-    <div>
-      <div class="stt-main">⚪ Not Clocked In</div>
-      <div class="stt-sub">Tap Clock In to start</div>
-    </div>
-  </div>
-
-  <!-- Selfie + camera -->
-  <div class="card">
-    <div class="card-lbl">Take your photo</div>
-    <div class="selfie-zone" id="selfieZone">
-      <div class="selfie-ph" id="selfiePh">
-        <span class="ico">📷</span>
-        Tap "Open Camera" to take a selfie before clocking in or out
-      </div>
-      <video id="wVideo" class="hidden" playsinline autoplay muted></video>
-      <img id="wPreview" class="hidden" alt="Captured selfie">
-      <div class="loc-chip hidden" id="locChip"><span class="loc-txt">📍 Location off</span></div>
-    </div>
-    <div class="cam-row">
-      <button class="btn btn-ghost btn-sm" id="btnCamera">📷 Open</button>
-      <button class="btn btn-green btn-sm" id="btnCapture" disabled>📸 Capture</button>
-      <button class="btn btn-ghost btn-sm" id="btnRetake" disabled>↻ Retake</button>
-      <button class="btn btn-ghost btn-sm" id="btnCamToggle" disabled>🔄 Flip</button>
-    </div>
-
-    <!-- Clock buttons -->
-    <div class="clock-actions">
-      <button class="btn btn-green" id="btnClockIn">🟢 Clock In</button>
-      <button class="btn btn-red" id="btnClockOut" disabled>🔴 Clock Out</button>
-    </div>
-
-    <!-- Quick actions -->
-    <div class="quick-row">
-      <button class="btn btn-ghost btn-sm" id="btnRecords">📋 Records</button>
-      <button class="btn btn-ghost btn-sm" id="btnLeave">🌿 Leave</button>
-      <button class="btn btn-ghost btn-sm" id="btnChangePin">🔒 PIN</button>
-    </div>
-  </div>
-
-  <!-- My salary balance (PIN protected) -->
-  <div class="card">
-    <div class="card-lbl">💵 My Salary — This Month</div>
-    <div id="payBox"><div class="pay-hint">Tap the button and enter your PIN to see your salary balance so far.</div></div>
-    <button class="btn btn-green btn-block" id="btnShowPay">👁 Show My Salary</button>
-  </div>
-
-  <!-- Messages from the office (PIN protected) -->
-  <div class="card">
-    <div class="card-lbl">📨 Notices from Office</div>
-    <button class="btn btn-ghost btn-block" id="btnMessages">📨 Open Notices</button>
-  </div>
-
-  <!-- My details: phone, ID, birthday, address, bank (PIN protected) -->
-  <div class="card">
-    <div class="card-lbl">👤 My Details</div>
-    <div class="pay-hint">Phone, ID number, birthday, address and bank account for salary.</div>
-    <button class="btn btn-ghost btn-block" id="btnProfile">👤 Open My Details</button>
-  </div>
-
-  <!-- Advance request -->
-  <div class="card">
-    <div class="card-lbl">💰 Request Salary Advance</div>
+<!-- LOGIN -->
+<section id="loginSection">
+  <div class="card login-card">
+    <div class="card-lbl">Log in</div>
     <div class="field">
-      <label for="advanceAmount">Amount (Rs.)</label>
-      <input class="input num-in" type="number" id="advanceAmount" inputmode="numeric" placeholder="0" min="0">
+      <label for="loginId">Emp No. or your name</label>
+      <input class="input" type="text" id="loginId" autocomplete="off" autocapitalize="characters" maxlength="60" placeholder="e.g. EMP005 or 5 or your name" aria-label="Employee number or name">
     </div>
-    <div class="field">
-      <label for="advanceReason">Reason (optional)</label>
-      <input class="input" type="text" id="advanceReason" placeholder="Why do you need the advance?">
-    </div>
-    <button class="btn btn-green btn-block" id="btnAdvanceSubmit">Send Advance Request</button>
-  </div>
-
-</section>
-
-<!-- PIN MODAL -->
-<div class="modal hidden" id="pinModal" role="dialog" aria-modal="true">
-  <div class="modal-card">
-    <h3>Enter PIN</h3>
-    <div class="who" id="pinWorkerLbl"></div>
+    <div class="lg-hint">Then enter your 4-digit PIN.</div>
     <div class="pin-dots">
       <span class="pin-dot"></span><span class="pin-dot"></span>
       <span class="pin-dot"></span><span class="pin-dot"></span>
     </div>
-    <div class="pin-err" id="pinError"></div>
+    <div class="pin-err" id="loginError" role="alert" style="text-align:center"></div>
     <div class="keypad">
       <button class="pin-key" data-key="1">1</button>
       <button class="pin-key" data-key="2">2</button>
@@ -393,9 +336,123 @@ textarea.input { resize: vertical; min-height: 64px; }
       <button class="pin-key" data-key="0">0</button>
       <button class="pin-key" data-key="del">⌫</button>
     </div>
-    <button class="modal-cancel" id="pinCancel">Cancel</button>
+  </div>
+</section>
+
+<!-- Worker section (after login) -->
+<section id="workerSection" class="hidden">
+
+  <div class="sess-bar">
+    <div class="who-n"><span id="whoName">—</span><small id="whoId"></small></div>
+    <button class="btn btn-ghost btn-sm" id="btnLogout">⏻ Log out</button>
+  </div>
+  <div class="idle-warn hidden" id="idleWarn">Logging out soon for safety — tap here to stay logged in</div>
+
+  <!-- Status -->
+  <div class="status-banner" id="statusBanner">
+    <span class="sdot"></span>
+    <div>
+      <div class="stt-main">⚪ Not Clocked In</div>
+      <div class="stt-sub">Take your photo, then tap Clock In</div>
+    </div>
+  </div>
+
+  <!-- Camera opens by itself -->
+  <div class="card">
+    <div class="card-lbl">Your photo</div>
+    <div class="selfie-zone" id="selfieZone">
+      <div class="selfie-ph" id="selfiePh"><span class="ico">📷</span>Starting camera…</div>
+      <video id="wVideo" class="hidden" playsinline autoplay muted></video>
+      <img id="wPreview" class="hidden" alt="Captured selfie">
+      <div class="cam-msg hidden" id="camMsg"></div>
+      <div class="loc-chip hidden" id="locChip"><span class="loc-txt">📍 Location off</span></div>
+    </div>
+    <div class="cam-row">
+      <button class="btn btn-green btn-capture" id="btnCapture" disabled>📸 Capture</button>
+      <button class="btn btn-ghost btn-sm" id="btnRetake" disabled>↻ Retake</button>
+      <button class="btn btn-ghost btn-sm" id="btnCamToggle" disabled>🔄 Flip</button>
+    </div>
+
+    <div class="clock-actions">
+      <button class="btn btn-green" id="btnClockIn" disabled>🟢 Clock In</button>
+      <button class="btn btn-red" id="btnClockOut" disabled>🔴 Clock Out</button>
+    </div>
+
+    <div class="quick-row">
+      <button class="btn btn-ghost btn-sm" id="btnRecords">📋 Records</button>
+      <button class="btn btn-ghost btn-sm" id="btnLeave">🌿 Leave</button>
+      <button class="btn btn-ghost btn-sm" id="btnChangePin">🔒 PIN</button>
+    </div>
+  </div>
+
+  <!-- Team leader: clock people who have no phone -->
+  <div class="card hidden" id="teamCard">
+    <div class="card-lbl">👥 My Team — clock in / out</div>
+    <div class="pay-hint">Use this for team members who have no phone. Their photo is taken on this phone. Salary, leave and advances are only available in their own login.</div>
+    <div id="teamList"></div>
+  </div>
+
+  <!-- My salary balance -->
+  <div class="card">
+    <div class="card-lbl">💵 My Salary — This Month</div>
+    <div id="payBox"><div class="pay-hint">Tap the button to see your salary balance so far.</div></div>
+    <button class="btn btn-green btn-block" id="btnShowPay">👁 Show My Salary</button>
+  </div>
+
+  <!-- Messages from the office -->
+  <div class="card">
+    <div class="card-lbl">📨 Notices from Office</div>
+    <button class="btn btn-ghost btn-block" id="btnMessages">📨 Open Notices</button>
+  </div>
+
+  <!-- My details: phone, ID, birthday, address, bank -->
+  <div class="card">
+    <div class="card-lbl">👤 My Details</div>
+    <div class="pay-hint">Phone, ID number, birthday, address and bank account for salary.</div>
+    <button class="btn btn-ghost btn-block" id="btnProfile">👤 Open My Details</button>
+  </div>
+
+  <!-- Advance request -->
+  <div class="card">
+    <div class="card-lbl">💰 Request Salary Advance</div>
+    <div class="adv-info" id="advInfo">Loading limit…</div>
+    <div class="field">
+      <label for="advanceAmount">Amount (Rs.)</label>
+      <input class="input num-in" type="number" id="advanceAmount" inputmode="numeric" placeholder="0" min="0">
+    </div>
+    <div class="field">
+      <label for="advanceReason">Reason (optional)</label>
+      <input class="input" type="text" id="advanceReason" placeholder="Why do you need the advance?">
+    </div>
+    <button class="btn btn-green btn-block" id="btnAdvanceSubmit">Send Advance Request</button>
+  </div>
+
+</section>
+
+<!-- TEAM CLOCK SHEET -->
+<div class="sheet hidden" id="teamSheet" role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <h3 id="teamSheetTitle">Team clock</h3>
+      <button class="sheet-x" id="closeTeamSheet" aria-label="Close">×</button>
+    </div>
+    <div class="selfie-zone" id="tSelfieZone">
+      <div class="selfie-ph" id="tSelfiePh"><span class="ico">📷</span>Starting camera…</div>
+      <video id="tVideo" class="hidden" playsinline autoplay muted></video>
+      <img id="tPreview" class="hidden" alt="Captured photo">
+      <div class="cam-msg hidden" id="tCamMsg"></div>
+    </div>
+    <div class="cam-row">
+      <button class="btn btn-green btn-capture" id="tCapture" disabled>📸 Capture</button>
+      <button class="btn btn-ghost btn-sm" id="tRetake" disabled>↻ Retake</button>
+      <button class="btn btn-ghost btn-sm" id="tFlip" disabled>🔄 Flip</button>
+    </div>
+    <button class="btn btn-green btn-block" id="tConfirm" disabled>Confirm</button>
+    <div class="pin-err" id="tErr" role="alert" style="text-align:center;margin-top:10px"></div>
   </div>
 </div>
+
+<div class="busy hidden" id="busy"><div class="bx"><div class="spin"></div><span id="busyTxt">Please wait…</span></div></div>
 
 <!-- CHANGE PIN SHEET -->
 <div class="sheet hidden" id="changePinSheet" role="dialog" aria-modal="true">

@@ -4,7 +4,9 @@
 //  Strategy: NETWORK-FIRST for the app's own files (so a new deploy is picked
 //  up automatically), cache fallback when offline. The backend is never cached.
 // ═══════════════════════════════════════════════════
-const CACHE = 'sphome-admin-v2';
+const BRAND = 'sphome';                 // per client (cache name prefix)
+const CACHE = BRAND + '-admin-v4';
+const NET_TIMEOUT_MS = 2500;           // slow / dead network → open the saved copy at once (fast start)
 const ASSETS = [
   './',
   './index.html',
@@ -33,7 +35,7 @@ self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys().then(function (keys) {
       return Promise.all(
-        keys.filter(function (k) { return k.indexOf('sphome-admin-') === 0 && k !== CACHE; })
+        keys.filter(function (k) { return k.indexOf(BRAND + '-admin-') === 0 && k !== CACHE; })
             .map(function (k) { return caches.delete(k); })
       );
     }).then(function () { return self.clients.claim(); })
@@ -53,19 +55,25 @@ self.addEventListener('fetch', function (e) {
   // Only manage same-origin files; let the browser handle fonts etc. itself.
   if (url.origin !== self.location.origin) return;
 
-  e.respondWith(
-    fetch(req).then(function (res) {
+  // Network-first (new deployments are picked up automatically) but never wait longer than NET_TIMEOUT_MS:
+  // on a slow signal the saved copy opens immediately while the fresh copy keeps downloading in the background.
+  e.respondWith((function () {
+    const network = fetch(req).then(function (res) {
       if (res && res.status === 200) {
         const clone = res.clone();
         caches.open(CACHE).then(function (c) { c.put(req, clone); });
       }
       return res;
-    }).catch(function () {
+    });
+    const timeout = new Promise(function (resolve) {
+      setTimeout(function () { resolve(caches.match(req).then(function (c) { return c || network; })); }, NET_TIMEOUT_MS);
+    });
+    return Promise.race([network, timeout]).catch(function () {
       return caches.match(req).then(function (cached) {
         if (cached) return cached;
         if (req.mode === 'navigate') return caches.match('./index.html');
         return Response.error();
       });
-    })
-  );
+    });
+  })());
 });
